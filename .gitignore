@@ -1,29 +1,23 @@
-# ==========================
-# Frontend (Next.js)
-# ==========================
-# frontend/node_modules/
-# frontend/.next/
-# frontend/out/
+# Visual Studio
+.vs/
+*.suo
 
-# ==========================
-# Backend (ASP.NET Core)
-# ==========================
-backend/**/bin/
-backend/**/obj/
-backend/.vs/
+# Build output
+bin/
+obj/
+**/bin/
+**/obj/
 
-# ==========================
-# VS Code
-# ==========================
-.vscode/
+# Cache / Database temp
+*.cache
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
 
-# ==========================
 # Logs
-# ==========================
 *.log
 
-# ==========================
 # Environment
-# ==========================
 .env
-.env.local
+appsettings.Development.json
