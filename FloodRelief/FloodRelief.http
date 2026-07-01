@@ -1,0 +1,6 @@
+@FloodRelief_HostAddress = http://localhost:5110
+
+GET {{FloodRelief_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
