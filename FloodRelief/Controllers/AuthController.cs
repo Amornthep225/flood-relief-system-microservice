@@ -50,7 +50,7 @@ namespace FloodRelief.Controllers
                 FullName = dto.FullName,
                 PhoneNumber = dto.PhoneNumber,
                 Email = dto.Email,
-                Role = dto.Role,
+                Role = "User",
                 IsActive = true,
                 CreatedAt = DateTime.Now
             };

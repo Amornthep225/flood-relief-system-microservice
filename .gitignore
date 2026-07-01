@@ -1,15 +1,28 @@
 # Visual Studio
 .vs/
 *.suo
+*.user
+*.csproj.user
 
 # Build output
 bin/
 obj/
+[Bb]in/
+[Oo]bj/
 **/bin/
 **/obj/
+**/[Bb]in/
+**/[Oo]bj/
 
-# Cache / Database temp
+# ASP.NET generated files
+*.dll
+*.exe
+*.pdb
 *.cache
+*.json.cache
+*.dswa.cache.json
+
+# Database temp
 *.db
 *.db-shm
 *.db-wal

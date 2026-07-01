@@ -15,7 +15,5 @@ namespace FloodRelief.DTOs.Auth
 
         [Required]
         public string Password { get; set; } = string.Empty;
-
-        public string Role { get; set; } = "Donor";
     }
 }

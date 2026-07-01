@@ -236,10 +236,6 @@
           "password": {
             "minLength": 1,
             "type": "string"
-          },
-          "role": {
-            "type": "string",
-            "nullable": true
           }
         },
         "additionalProperties": false
