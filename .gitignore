@@ -1,10 +1,18 @@
+# ========================================
 # Visual Studio
+# ========================================
 .vs/
+.vscode/
+
 *.suo
 *.user
+*.userosscache
+*.sln.docstates
 *.csproj.user
 
+# ========================================
 # Build output
+# ========================================
 bin/
 obj/
 [Bb]in/
@@ -14,23 +22,44 @@ obj/
 **/[Bb]in/
 **/[Oo]bj/
 
-# ASP.NET generated files
+# ========================================
+# ASP.NET / .NET Generated
+# ========================================
 *.dll
 *.exe
 *.pdb
 *.cache
 *.json.cache
-*.dswa.cache.json
 
-# Database temp
+# Hot Reload / Razor / Blazor Cache
+*.dswa.cache.json
+*.rzmhtml.dswa.cache.json
+*.rzmrazor.dswa.cache.json
+
+# API Explorer
+ApiEndpoints.json
+
+# ========================================
+# Database
+# ========================================
 *.db
 *.db-shm
 *.db-wal
 *.sqlite
 
+# ========================================
 # Logs
+# ========================================
 *.log
 
+# ========================================
 # Environment
+# ========================================
 .env
 appsettings.Development.json
+
+# ========================================
+# OS
+# ========================================
+Thumbs.db
+.DS_Store

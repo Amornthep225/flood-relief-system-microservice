@@ -49,11 +49,21 @@ namespace FloodRelief
                     )
                 };
             });
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowNextApp", policy =>
+                {
+                    policy
+                        .WithOrigins("http://localhost:3000")
+                        .AllowAnyHeader()
+                        .AllowAnyMethod();
+                });
+            });
             var app = builder.Build();
 
             app.UseSwagger();
             app.UseSwaggerUI();
-
+            app.UseCors("AllowNextApp");
             app.UseHttpsRedirection();
             app.UseAuthentication();
             app.UseAuthorization();
