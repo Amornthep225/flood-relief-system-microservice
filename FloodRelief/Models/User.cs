@@ -13,6 +13,7 @@ namespace FloodRelief.Models
         public string FullName { get; set; } = string.Empty;
 
         [Required]
+        [StringLength (10)]
         public string PhoneNumber { get; set; } = string.Empty;
 
         [Required]

@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FloodRelief.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260701081602_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260702074044_AddAddressToUser")]
+    partial class AddAddressToUser
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -204,7 +204,8 @@ namespace FloodRelief.Migrations
 
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
 
                     b.Property<string>("Role")
                         .IsRequired()
