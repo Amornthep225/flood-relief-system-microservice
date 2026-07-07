@@ -48,5 +48,72 @@ namespace FloodRelief.Services.Auth
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
+        public string GenerateStaffToken(Staff staff)
+        {
+            var jwt = _configuration.GetSection("Jwt");
+
+            var claims = new List<Claim>
+        {
+        new Claim(ClaimTypes.NameIdentifier, staff.Id),
+        new Claim(ClaimTypes.Name, staff.FullName),
+        new Claim(ClaimTypes.Role, staff.Role),
+        new Claim("userType", "staff"),
+        new Claim("centerId", staff.CenterId)
+         };
+
+            var key = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwt["Key"]!)
+            );
+
+            var credentials = new SigningCredentials(
+                key,
+                SecurityAlgorithms.HmacSha256
+            );
+
+            var token = new JwtSecurityToken(
+                issuer: jwt["Issuer"],
+                audience: jwt["Audience"],
+                claims: claims,
+                expires: DateTime.Now.AddMinutes(
+                    Convert.ToDouble(jwt["ExpireMinutes"])
+                ),
+                signingCredentials: credentials
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+        public string GenerateAdminToken(Admin admin)
+        {
+            var jwt = _configuration.GetSection("Jwt");
+
+            var claims = new List<Claim>
+    {
+        new Claim(ClaimTypes.NameIdentifier, admin.Id),
+        new Claim(ClaimTypes.Name, admin.Username),
+        new Claim(ClaimTypes.Role, admin.Role),
+        new Claim("userType", "admin"),
+        new Claim("username", admin.Username),
+        new Claim("email", admin.Email)
+    };
+
+            var key = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwt["Key"]!)
+            );
+
+            var credentials = new SigningCredentials(
+                key,
+                SecurityAlgorithms.HmacSha256
+            );
+
+            var token = new JwtSecurityToken(
+                issuer: jwt["Issuer"],
+                audience: jwt["Audience"],
+                claims: claims,
+                expires: DateTime.Now.AddMinutes(Convert.ToDouble(jwt["ExpireMinutes"])),
+                signingCredentials: credentials
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
     }
 }

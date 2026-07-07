@@ -25,8 +25,8 @@ namespace FloodRelief.Migrations
             modelBuilder.Entity("FloodRelief.Models.Admin", b =>
                 {
                     b.Property<string>("Id")
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)");
+                        .HasMaxLength(2)
+                        .HasColumnType("varchar(2)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
@@ -61,13 +61,12 @@ namespace FloodRelief.Migrations
             modelBuilder.Entity("FloodRelief.Models.Center", b =>
                 {
                     b.Property<string>("Id")
-                        .HasMaxLength(8)
-                        .HasColumnType("varchar(8)");
+                        .HasMaxLength(3)
+                        .HasColumnType("varchar(3)");
 
                     b.Property<string>("Address")
                         .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("longtext");
 
                     b.Property<string>("CenterName")
                         .IsRequired()
@@ -76,16 +75,14 @@ namespace FloodRelief.Migrations
 
                     b.Property<string>("ContactName")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
+                        .HasColumnType("longtext");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
                     b.Property<string>("District")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
+                        .HasColumnType("longtext");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("tinyint(1)");
@@ -98,26 +95,24 @@ namespace FloodRelief.Migrations
 
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)");
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
 
                     b.Property<string>("Province")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
+                        .HasColumnType("longtext");
 
                     b.Property<string>("SubDistrict")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
+                        .HasColumnType("longtext");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime(6)");
 
                     b.Property<string>("ZipCode")
                         .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("varchar(10)");
+                        .HasMaxLength(5)
+                        .HasColumnType("varchar(5)");
 
                     b.HasKey("Id");
 
@@ -127,8 +122,8 @@ namespace FloodRelief.Migrations
             modelBuilder.Entity("FloodRelief.Models.Staff", b =>
                 {
                     b.Property<string>("Id")
-                        .HasMaxLength(8)
-                        .HasColumnType("varchar(8)");
+                        .HasMaxLength(4)
+                        .HasColumnType("varchar(4)");
 
                     b.Property<string>("CenterId")
                         .IsRequired()
@@ -155,7 +150,8 @@ namespace FloodRelief.Migrations
 
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
 
                     b.Property<string>("Role")
                         .IsRequired()

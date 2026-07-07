@@ -18,7 +18,7 @@ namespace FloodRelief.Migrations
                 name: "admins",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: false)
+                    Id = table.Column<string>(type: "varchar(2)", maxLength: 2, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     Username = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
@@ -42,23 +42,23 @@ namespace FloodRelief.Migrations
                 name: "centers",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "varchar(8)", maxLength: 8, nullable: false)
+                    Id = table.Column<string>(type: "varchar(3)", maxLength: 3, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     CenterName = table.Column<string>(type: "varchar(150)", maxLength: 150, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    Address = table.Column<string>(type: "varchar(255)", maxLength: 255, nullable: false)
+                    Address = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    Province = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false)
+                    Province = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    District = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false)
+                    District = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    SubDistrict = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false)
+                    SubDistrict = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    ZipCode = table.Column<string>(type: "varchar(10)", maxLength: 10, nullable: false)
+                    ZipCode = table.Column<string>(type: "varchar(5)", maxLength: 5, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    PhoneNumber = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: false)
+                    PhoneNumber = table.Column<string>(type: "varchar(10)", maxLength: 10, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    ContactName = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: false)
+                    ContactName = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     Latitude = table.Column<double>(type: "double", nullable: false),
                     Longitude = table.Column<double>(type: "double", nullable: false),
@@ -102,7 +102,7 @@ namespace FloodRelief.Migrations
                 name: "staffs",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "varchar(8)", maxLength: 8, nullable: false)
+                    Id = table.Column<string>(type: "varchar(4)", maxLength: 4, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     CenterId = table.Column<string>(type: "varchar(3)", maxLength: 3, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
@@ -112,7 +112,7 @@ namespace FloodRelief.Migrations
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     Email = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    PhoneNumber = table.Column<string>(type: "longtext", nullable: false)
+                    PhoneNumber = table.Column<string>(type: "varchar(10)", maxLength: 10, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     PasswordHash = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),

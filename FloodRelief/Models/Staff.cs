@@ -7,7 +7,7 @@ namespace FloodRelief.Models
     public class Staff
     {
         [Key]
-        [StringLength(8)]
+        [StringLength(4)]
         public string Id { get; set; } = string.Empty;
 
         [Required]
@@ -22,7 +22,8 @@ namespace FloodRelief.Models
 
         [Required]
         public string Email { get; set; } = string.Empty;
-
+        [Required]
+        [StringLength (10)]
         public string PhoneNumber { get; set; } = string.Empty;
 
         public string PasswordHash { get; set; } = string.Empty;

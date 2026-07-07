@@ -1,17 +1,12 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
-namespace FloodRelief.Models
+namespace FloodRelief.DTOs.Center
 {
-    [Table("centers")]
-    public class Center
+    public class CreateCenterRequestDto
     {
-        [Key]
-        [StringLength(3)]
-        public string Id { get; set; } = string.Empty;
-
         [Required]
-        [StringLength(150)]
+        public string Id { get; set; } = string.Empty;
+        [Required]
         public string CenterName { get; set; } = string.Empty;
 
         [Required]
@@ -26,10 +21,8 @@ namespace FloodRelief.Models
         [Required]
         public string SubDistrict { get; set; } = string.Empty;
 
-        [StringLength(5)]
         public string ZipCode { get; set; } = string.Empty;
 
-        [StringLength(10)]
         public string PhoneNumber { get; set; } = string.Empty;
 
         public string ContactName { get; set; } = string.Empty;
@@ -37,14 +30,5 @@ namespace FloodRelief.Models
         public double Latitude { get; set; }
 
         public double Longitude { get; set; }
-
-        public bool IsActive { get; set; } = true;
-
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
-
-        public DateTime? UpdatedAt { get; set; }
-
-        // Relationship
-        public ICollection<Staff> Staffs { get; set; } = new List<Staff>();
     }
 }

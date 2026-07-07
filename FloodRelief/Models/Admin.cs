@@ -7,7 +7,7 @@ namespace FloodRelief.Models
     public class Admin
     {
         [Key]
-        [StringLength(20)]
+        [StringLength(2)]
         public string Id { get; set; } = string.Empty;
 
         [Required]
