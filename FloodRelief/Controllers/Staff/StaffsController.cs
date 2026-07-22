@@ -87,7 +87,7 @@ namespace FloodRelief.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateStaff(CreateStaffRequestDto dto)
+        public async Task<IActionResult> CreateStaff([FromBody] CreateStaffRequestDto dto)
         {
             var centerExists = await _context.Centers.AnyAsync(x => x.Id == dto.CenterId);
 
@@ -144,7 +144,7 @@ namespace FloodRelief.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateStaff(string id, UpdateStaffRequestDto dto)
+        public async Task<IActionResult> UpdateStaff(string id, [FromBody] UpdateStaffRequestDto dto)
         {
             var staff = await _context.Staffs.FindAsync(id);
 
@@ -181,7 +181,7 @@ namespace FloodRelief.Controllers
         }
 
         [HttpPut("{id}/status")]
-        public async Task<IActionResult> UpdateStaffStatus(string id, UpdateStaffStatusDto dto)
+        public async Task<IActionResult> UpdateStaffStatus(string id, [FromBody] UpdateStaffStatusDto dto)
         {
             var staff = await _context.Staffs.FindAsync(id);
 

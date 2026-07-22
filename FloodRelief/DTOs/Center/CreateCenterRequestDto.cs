@@ -5,8 +5,6 @@ namespace FloodRelief.DTOs.Center
     public class CreateCenterRequestDto
     {
         [Required]
-        public string Id { get; set; } = string.Empty;
-        [Required]
         public string CenterName { get; set; } = string.Empty;
 
         [Required]

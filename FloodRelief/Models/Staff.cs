@@ -7,11 +7,11 @@ namespace FloodRelief.Models
     public class Staff
     {
         [Key]
-        [StringLength(4)]
+        [StringLength(5)]
         public string Id { get; set; } = string.Empty;
 
         [Required]
-        [StringLength(3)]
+        [StringLength(5)]
         public string CenterId { get; set; } = string.Empty;
 
         [Required]
@@ -22,8 +22,9 @@ namespace FloodRelief.Models
 
         [Required]
         public string Email { get; set; } = string.Empty;
+
         [Required]
-        [StringLength (10)]
+        [StringLength(10)]
         public string PhoneNumber { get; set; } = string.Empty;
 
         public string PasswordHash { get; set; } = string.Empty;
@@ -36,8 +37,14 @@ namespace FloodRelief.Models
 
         public DateTime? UpdatedAt { get; set; }
 
-        // Relationship
+        // Relationships
         [ForeignKey(nameof(CenterId))]
         public Center? Center { get; set; }
+
+        public ICollection<SosRequest> AssignedSosRequests { get; set; }
+            = new List<SosRequest>();
+
+        public ICollection<InventoryTransaction> InventoryTransactions { get; set; }
+            = new List<InventoryTransaction>();
     }
 }

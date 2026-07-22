@@ -5,6 +5,7 @@ namespace FloodRelief.DTOs.Staff
     public class CreateStaffRequestDto
     {
         [Required]
+        [StringLength(5)]
         public string CenterId { get; set; } = string.Empty;
 
         [Required]

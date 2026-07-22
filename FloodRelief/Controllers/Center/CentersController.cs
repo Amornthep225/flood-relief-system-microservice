@@ -16,6 +16,7 @@ namespace FloodRelief.Controllers.Center
             _context = context;
         }
 
+
         [HttpGet]
         public async Task<IActionResult> GetCenters()
         {
@@ -43,8 +44,10 @@ namespace FloodRelief.Controllers.Center
             return Ok(centers);
         }
 
+
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetCenterById(string id)
+        public async Task<IActionResult> GetCenterById(
+            string id)
         {
             var center = await _context.Centers
                 .Where(x => x.Id == id)
@@ -67,18 +70,46 @@ namespace FloodRelief.Controllers.Center
                 })
                 .FirstOrDefaultAsync();
 
+
             if (center == null)
-                return NotFound(new { message = "ไม่พบศูนย์" });
+                return NotFound(new
+                {
+                    message = "ไม่พบศูนย์"
+                });
+
 
             return Ok(center);
         }
 
+
+
         [HttpPost]
-        public async Task<IActionResult> CreateCenter(CreateCenterRequestDto dto)
+        public async Task<IActionResult> CreateCenter(
+            [FromBody] CreateCenterRequestDto dto)
         {
+            var lastCenter = await _context.Centers
+                .OrderByDescending(x => x.Id)
+                .FirstOrDefaultAsync();
+
+
+            int nextId = 1;
+
+
+            if (lastCenter != null)
+            {
+                nextId = int.Parse(lastCenter.Id) + 1;
+            }
+
+
+            string newCenterId =
+                nextId.ToString()
+                .PadLeft(5, '0');
+
+
+
             var center = new FloodRelief.Models.Center
             {
-                Id = dto.Id,
+                Id = newCenterId,
                 CenterName = dto.CenterName,
                 Address = dto.Address,
                 Province = dto.Province,
@@ -93,8 +124,11 @@ namespace FloodRelief.Controllers.Center
                 CreatedAt = DateTime.Now
             };
 
+
             _context.Centers.Add(center);
+
             await _context.SaveChangesAsync();
+
 
             return Ok(new
             {
@@ -104,13 +138,24 @@ namespace FloodRelief.Controllers.Center
             });
         }
 
+
+
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateCenter(string id, CreateCenterRequestDto dto)
+        public async Task<IActionResult> UpdateCenter(
+            string id,
+            [FromBody] CreateCenterRequestDto dto)
         {
-            var center = await _context.Centers.FindAsync(id);
+            var center =
+                await _context.Centers.FindAsync(id);
+
 
             if (center == null)
-                return NotFound(new { message = "ไม่พบศูนย์" });
+                return NotFound(new
+                {
+                    message = "ไม่พบศูนย์"
+                });
+
+
 
             center.CenterName = dto.CenterName;
             center.Address = dto.Address;
@@ -124,25 +169,45 @@ namespace FloodRelief.Controllers.Center
             center.Longitude = dto.Longitude;
             center.UpdatedAt = DateTime.Now;
 
+
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "แก้ไขศูนย์สำเร็จ" });
+
+            return Ok(new
+            {
+                message = "แก้ไขศูนย์สำเร็จ"
+            });
         }
 
+
+
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteCenter(string id)
+        public async Task<IActionResult> DeleteCenter(
+            string id)
         {
-            var center = await _context.Centers.FindAsync(id);
+            var center =
+                await _context.Centers.FindAsync(id);
+
 
             if (center == null)
-                return NotFound(new { message = "ไม่พบศูนย์" });
+                return NotFound(new
+                {
+                    message = "ไม่พบศูนย์"
+                });
+
+
 
             center.IsActive = false;
             center.UpdatedAt = DateTime.Now;
 
+
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "ปิดใช้งานศูนย์สำเร็จ" });
+
+            return Ok(new
+            {
+                message = "ปิดใช้งานศูนย์สำเร็จ"
+            });
         }
     }
 }

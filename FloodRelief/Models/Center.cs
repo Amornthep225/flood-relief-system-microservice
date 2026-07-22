@@ -7,7 +7,7 @@ namespace FloodRelief.Models
     public class Center
     {
         [Key]
-        [StringLength(3)]
+        [StringLength(5)]
         public string Id { get; set; } = string.Empty;
 
         [Required]
@@ -46,5 +46,10 @@ namespace FloodRelief.Models
 
         // Relationship
         public ICollection<Staff> Staffs { get; set; } = new List<Staff>();
+
+        public ICollection<SosRequest> SosRequests { get; set; }
+        = new List<SosRequest>();
+        public ICollection<CenterInventory> Inventories { get; set; }
+    = new List<CenterInventory>();
     }
 }

@@ -62,7 +62,7 @@ namespace FloodRelief.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateUser(string id, UpdateUserRequestDto dto)
+        public async Task<IActionResult> UpdateUser(string id, [FromBody] UpdateUserRequestDto dto)
         {
             var user = await _context.Users.FindAsync(id);
 
@@ -88,7 +88,7 @@ namespace FloodRelief.Controllers
         }
 
         [HttpPut("{id}/status")]
-        public async Task<IActionResult> UpdateUserStatus(string id, UpdateUserStatusDto dto)
+        public async Task<IActionResult> UpdateUserStatus(string id, [FromBody] UpdateUserStatusDto dto)
         {
             var user = await _context.Users.FindAsync(id);
 
