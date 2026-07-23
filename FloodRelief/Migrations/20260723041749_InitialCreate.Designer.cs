@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FloodRelief.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260721105117_InitialCreate")]
+    [Migration("20260723041749_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -69,7 +69,8 @@ namespace FloodRelief.Migrations
 
                     b.Property<string>("Address")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
 
                     b.Property<string>("CenterName")
                         .IsRequired()
@@ -78,14 +79,19 @@ namespace FloodRelief.Migrations
 
                     b.Property<string>("ContactName")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
                     b.Property<string>("District")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<int?>("DistrictId")
+                        .HasColumnType("int");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("tinyint(1)");
@@ -103,11 +109,19 @@ namespace FloodRelief.Migrations
 
                     b.Property<string>("Province")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<int?>("ProvinceId")
+                        .HasColumnType("int");
 
                     b.Property<string>("SubDistrict")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<int?>("SubDistrictId")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime(6)");
@@ -118,6 +132,12 @@ namespace FloodRelief.Migrations
                         .HasColumnType("varchar(5)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DistrictId");
+
+                    b.HasIndex("ProvinceId");
+
+                    b.HasIndex("SubDistrictId");
 
                     b.ToTable("centers");
                 });
@@ -281,8 +301,8 @@ namespace FloodRelief.Migrations
                         .HasColumnType("varchar(30)");
 
                     b.Property<string>("StaffId")
-                        .HasMaxLength(10)
-                        .HasColumnType("varchar(10)");
+                        .HasMaxLength(5)
+                        .HasColumnType("varchar(5)");
 
                     b.Property<string>("TransactionType")
                         .IsRequired()
@@ -527,6 +547,172 @@ namespace FloodRelief.Migrations
                     b.ToTable("staffs");
                 });
 
+            modelBuilder.Entity("FloodRelief.Models.ThaiDistrict", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("CreatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("NameEn")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("name_en");
+
+                    b.Property<string>("NameTh")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("name_th");
+
+                    b.Property<int>("ProvinceId")
+                        .HasColumnType("int")
+                        .HasColumnName("province_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProvinceId");
+
+                    b.ToTable("districts");
+                });
+
+            modelBuilder.Entity("FloodRelief.Models.ThaiGeography", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("geographies");
+                });
+
+            modelBuilder.Entity("FloodRelief.Models.ThaiProvince", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("CreatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<int>("GeographyId")
+                        .HasColumnType("int")
+                        .HasColumnName("geography_id");
+
+                    b.Property<string>("NameEn")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("name_en");
+
+                    b.Property<string>("NameTh")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("name_th");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GeographyId");
+
+                    b.HasIndex("NameTh");
+
+                    b.ToTable("provinces");
+                });
+
+            modelBuilder.Entity("FloodRelief.Models.ThaiSubDistrict", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("CreatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<int>("DistrictId")
+                        .HasColumnType("int")
+                        .HasColumnName("district_id");
+
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("double")
+                        .HasColumnName("lat");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("double")
+                        .HasColumnName("long");
+
+                    b.Property<string>("NameEn")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("name_en");
+
+                    b.Property<string>("NameTh")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)")
+                        .HasColumnName("name_th");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int>("ZipCode")
+                        .HasColumnType("int")
+                        .HasColumnName("zip_code");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DistrictId");
+
+                    b.ToTable("sub_districts");
+                });
+
             modelBuilder.Entity("FloodRelief.Models.User", b =>
                 {
                     b.Property<string>("Id")
@@ -566,6 +752,30 @@ namespace FloodRelief.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("users");
+                });
+
+            modelBuilder.Entity("FloodRelief.Models.Center", b =>
+                {
+                    b.HasOne("FloodRelief.Models.ThaiDistrict", "DistrictData")
+                        .WithMany("Centers")
+                        .HasForeignKey("DistrictId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FloodRelief.Models.ThaiProvince", "ProvinceData")
+                        .WithMany("Centers")
+                        .HasForeignKey("ProvinceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FloodRelief.Models.ThaiSubDistrict", "SubDistrictData")
+                        .WithMany("Centers")
+                        .HasForeignKey("SubDistrictId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("DistrictData");
+
+                    b.Navigation("ProvinceData");
+
+                    b.Navigation("SubDistrictData");
                 });
 
             modelBuilder.Entity("FloodRelief.Models.CenterInventory", b =>
@@ -634,7 +844,7 @@ namespace FloodRelief.Migrations
                         .IsRequired();
 
                     b.HasOne("FloodRelief.Models.Staff", "Staff")
-                        .WithMany()
+                        .WithMany("InventoryTransactions")
                         .HasForeignKey("StaffId")
                         .OnDelete(DeleteBehavior.SetNull);
 
@@ -709,6 +919,39 @@ namespace FloodRelief.Migrations
                     b.Navigation("Center");
                 });
 
+            modelBuilder.Entity("FloodRelief.Models.ThaiDistrict", b =>
+                {
+                    b.HasOne("FloodRelief.Models.ThaiProvince", "Province")
+                        .WithMany("Districts")
+                        .HasForeignKey("ProvinceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Province");
+                });
+
+            modelBuilder.Entity("FloodRelief.Models.ThaiProvince", b =>
+                {
+                    b.HasOne("FloodRelief.Models.ThaiGeography", "Geography")
+                        .WithMany("Provinces")
+                        .HasForeignKey("GeographyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Geography");
+                });
+
+            modelBuilder.Entity("FloodRelief.Models.ThaiSubDistrict", b =>
+                {
+                    b.HasOne("FloodRelief.Models.ThaiDistrict", "District")
+                        .WithMany("SubDistricts")
+                        .HasForeignKey("DistrictId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("District");
+                });
+
             modelBuilder.Entity("FloodRelief.Models.Center", b =>
                 {
                     b.Navigation("Inventories");
@@ -746,6 +989,32 @@ namespace FloodRelief.Migrations
             modelBuilder.Entity("FloodRelief.Models.Staff", b =>
                 {
                     b.Navigation("AssignedSosRequests");
+
+                    b.Navigation("InventoryTransactions");
+                });
+
+            modelBuilder.Entity("FloodRelief.Models.ThaiDistrict", b =>
+                {
+                    b.Navigation("Centers");
+
+                    b.Navigation("SubDistricts");
+                });
+
+            modelBuilder.Entity("FloodRelief.Models.ThaiGeography", b =>
+                {
+                    b.Navigation("Provinces");
+                });
+
+            modelBuilder.Entity("FloodRelief.Models.ThaiProvince", b =>
+                {
+                    b.Navigation("Centers");
+
+                    b.Navigation("Districts");
+                });
+
+            modelBuilder.Entity("FloodRelief.Models.ThaiSubDistrict", b =>
+                {
+                    b.Navigation("Centers");
                 });
 
             modelBuilder.Entity("FloodRelief.Models.User", b =>

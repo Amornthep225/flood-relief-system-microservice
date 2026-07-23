@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace FloodRelief.Models
@@ -15,15 +15,27 @@ namespace FloodRelief.Models
         public string CenterName { get; set; } = string.Empty;
 
         [Required]
+        [StringLength(500)]
         public string Address { get; set; } = string.Empty;
 
+        // ใช้ nullable ชั่วคราวเพื่อรองรับข้อมูลศูนย์เดิมที่ยังไม่มี Address ID
+        public int? ProvinceId { get; set; }
+
+        public int? DistrictId { get; set; }
+
+        public int? SubDistrictId { get; set; }
+
+        // เก็บชื่อไว้เพื่อรองรับ Response และข้อมูลเดิมของระบบ
         [Required]
+        [StringLength(150)]
         public string Province { get; set; } = string.Empty;
 
         [Required]
+        [StringLength(150)]
         public string District { get; set; } = string.Empty;
 
         [Required]
+        [StringLength(150)]
         public string SubDistrict { get; set; } = string.Empty;
 
         [StringLength(5)]
@@ -32,6 +44,7 @@ namespace FloodRelief.Models
         [StringLength(10)]
         public string PhoneNumber { get; set; } = string.Empty;
 
+        [StringLength(150)]
         public string ContactName { get; set; } = string.Empty;
 
         public double Latitude { get; set; }
@@ -44,12 +57,22 @@ namespace FloodRelief.Models
 
         public DateTime? UpdatedAt { get; set; }
 
-        // Relationship
-        public ICollection<Staff> Staffs { get; set; } = new List<Staff>();
+        [ForeignKey(nameof(ProvinceId))]
+        public ThaiProvince? ProvinceData { get; set; }
+
+        [ForeignKey(nameof(DistrictId))]
+        public ThaiDistrict? DistrictData { get; set; }
+
+        [ForeignKey(nameof(SubDistrictId))]
+        public ThaiSubDistrict? SubDistrictData { get; set; }
+
+        public ICollection<Staff> Staffs { get; set; }
+            = new List<Staff>();
 
         public ICollection<SosRequest> SosRequests { get; set; }
-        = new List<SosRequest>();
+            = new List<SosRequest>();
+
         public ICollection<CenterInventory> Inventories { get; set; }
-    = new List<CenterInventory>();
+            = new List<CenterInventory>();
     }
 }

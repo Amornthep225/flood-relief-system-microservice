@@ -2,7 +2,7 @@
 
 namespace FloodRelief.DTOs.Center
 {
-    public class CreateCenterRequestDto
+    public class UpdateCenterRequestDto
     {
         [Required]
         [StringLength(150)]
@@ -39,5 +39,7 @@ namespace FloodRelief.DTOs.Center
 
         [Range(-180, 180)]
         public double Longitude { get; set; }
+
+        public bool IsActive { get; set; }
     }
 }
