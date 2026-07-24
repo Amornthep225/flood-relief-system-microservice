@@ -262,12 +262,17 @@ namespace FloodRelief.Controllers
         }
 
         // GET: api/sos-requests/my
+        // GET: api/sos-requests/my
         [HttpGet("my")]
         [Authorize(Roles = "User")]
-        public async Task<IActionResult> GetMySosRequests()
+        public async Task<IActionResult> GetMySosRequests(
+            DateTime? startDate,
+            DateTime? endDate,
+            string? status)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
+            var userId = User.FindFirstValue(
+                ClaimTypes.NameIdentifier
+            );
             if (string.IsNullOrWhiteSpace(userId))
             {
                 return Unauthorized(new
@@ -275,46 +280,76 @@ namespace FloodRelief.Controllers
                     message = "ไม่พบข้อมูลผู้ใช้จาก Token"
                 });
             }
-
-            var requests = await _context.SosRequests
+          var query = _context.SosRequests
                 .AsNoTracking()
-                .Where(x => x.UserId == userId)
+                .Where(x => x.UserId == userId);
+            // วันที่เริ่มต้น
+            if (startDate.HasValue)
+            {
+                query = query.Where(x =>
+                    x.CreatedAt >= startDate.Value.Date
+                );
+            }
+            // วันที่สิ้นสุด
+            if (endDate.HasValue)
+            {
+                var endDateNext =
+                    endDate.Value.Date.AddDays(1);
+
+
+                query = query.Where(x =>
+                    x.CreatedAt < endDateNext
+                );
+            }
+            // Status
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                query = query.Where(x =>
+                    x.Status == status
+                );
+            }
+            var requests = await query
+
                 .OrderByDescending(x => x.CreatedAt)
+
                 .Select(x => new SosRequestListDto
                 {
                     Id = x.Id,
                     UserId = x.UserId,
-
-                    UserFullName = x.User != null
+                    UserFullName =
+                        x.User != null
                         ? x.User.FullName
                         : string.Empty,
-
-                    UserPhoneNumber = x.User != null
+                    UserPhoneNumber =
+                        x.User != null
                         ? x.User.PhoneNumber
                         : string.Empty,
-
                     CenterId = x.CenterId,
-
-                    CenterName = x.Center != null
+                    CenterName =
+                        x.Center != null
                         ? x.Center.CenterName
                         : null,
-
-                    AssignedStaffId = x.AssignedStaffId,
-
-                    AssignedStaffName = x.AssignedStaff != null
+                    AssignedStaffId =
+                        x.AssignedStaffId,
+                    AssignedStaffName =
+                        x.AssignedStaff != null
                         ? x.AssignedStaff.FullName
                         : null,
                     Latitude = x.Latitude,
                     Longitude = x.Longitude,
-                    AddressDetail = x.AddressDetail,
-                    Priority = x.Priority,
-                    Status = x.Status,
+                    AddressDetail =
+                        x.AddressDetail,
+                    Priority =
+                        x.Priority,
+                    Status =
+                        x.Status,
+                    CreatedAt =
+                        x.CreatedAt,
+                    UpdatedAt =
+                        x.UpdatedAt
 
-                    CreatedAt = x.CreatedAt,
-                    UpdatedAt = x.UpdatedAt
                 })
                 .ToListAsync();
-
             return Ok(requests);
         }
 
@@ -373,58 +408,178 @@ namespace FloodRelief.Controllers
 
         // GET: api/sos-requests/{id}
         [HttpGet("{id}")]
+        [Authorize]
         public async Task<IActionResult> GetSosRequestById(string id)
         {
-            var request = await _context.SosRequests
+            var userId = User.FindFirstValue(
+                ClaimTypes.NameIdentifier
+            );
+
+
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return Unauthorized(new
+                {
+                    message = "ไม่พบข้อมูลผู้ใช้"
+                });
+            }
+
+
+            var request =
+                await _context.SosRequests
+
                 .AsNoTracking()
-                .Where(x => x.Id == id)
+
+                .Include(x => x.Items)
+                    .ThenInclude(x => x.ReliefItem)
+
+                .Include(x => x.Center)
+
+                .Include(x => x.AssignedStaff)
+
+
+                .Where(x =>
+                    x.Id == id &&
+                    x.UserId == userId
+                )
+
+
                 .Select(x => new SosRequestDetailDto
                 {
+
                     Id = x.Id,
+
                     UserId = x.UserId,
-                    UserFullName = x.User != null ? x.User.FullName : string.Empty,
-                    UserPhoneNumber = x.User != null ? x.User.PhoneNumber : string.Empty,
-                    UserEmail = x.User != null ? x.User.Email : string.Empty,
+
+
+                    UserFullName =
+                        x.User != null
+                        ? x.User.FullName
+                        : "",
+
+
+                    UserPhoneNumber =
+                        x.User != null
+                        ? x.User.PhoneNumber
+                        : "",
+
+
+                    UserEmail =
+                        x.User != null
+                        ? x.User.Email
+                        : "",
+
+
 
                     CenterId = x.CenterId,
-                    CenterName = x.Center != null ? x.Center.CenterName : null,
-                    CenterPhoneNumber = x.Center != null ? x.Center.PhoneNumber : null,
 
-                    AssignedStaffId = x.AssignedStaffId,
-                    AssignedStaffName = x.AssignedStaff != null ? x.AssignedStaff.FullName : null,
-                    AssignedStaffPhoneNumber = x.AssignedStaff != null ? x.AssignedStaff.PhoneNumber : null,
+
+                    CenterName =
+                        x.Center != null
+                        ? x.Center.CenterName
+                        : null,
+
+
+                    CenterPhoneNumber =
+                        x.Center != null
+                        ? x.Center.PhoneNumber
+                        : null,
+
+
+
+                    AssignedStaffId =
+                        x.AssignedStaffId,
+
+
+                    AssignedStaffName =
+                        x.AssignedStaff != null
+                        ? x.AssignedStaff.FullName
+                        : null,
+
+
+                    AssignedStaffPhoneNumber =
+                        x.AssignedStaff != null
+                        ? x.AssignedStaff.PhoneNumber
+                        : null,
+
+
 
                     Latitude = x.Latitude,
+
                     Longitude = x.Longitude,
+
+
                     AddressDetail = x.AddressDetail,
+
+
                     Priority = x.Priority,
+
+
                     Status = x.Status,
+
+
                     UserRemark = x.UserRemark,
+
+
                     StaffRemark = x.StaffRemark,
 
+
+
                     CreatedAt = x.CreatedAt,
+
                     AcceptedAt = x.AcceptedAt,
+
                     PreparingAt = x.PreparingAt,
+
                     DeliveringAt = x.DeliveringAt,
+
                     CompletedAt = x.CompletedAt,
+
                     CancelledAt = x.CancelledAt,
+
                     UpdatedAt = x.UpdatedAt,
 
-                    Items = x.Items.Select(item => new SosRequestItemDto
-                    {
-                        Id = item.Id,
-                        ReliefItemId = item.ReliefItemId,
-                        ReliefItemName = item.ReliefItem != null ? item.ReliefItem.Name : string.Empty,
-                        Quantity = item.Quantity,
-                        Unit = item.Unit
-                    }).ToList()
+
+
+                    Items =
+                        x.Items.Select(i => new SosRequestItemDto
+                        {
+
+                            Id = i.Id,
+
+
+                            ReliefItemId = i.ReliefItemId,
+
+
+                            ReliefItemName =
+                                i.ReliefItem != null
+                                ? i.ReliefItem.Name
+                                : "ไม่ระบุ",
+
+
+                            Quantity = i.Quantity,
+
+
+                            Unit = i.Unit
+
+
+                        }).ToList()
+
                 })
+
+
                 .FirstOrDefaultAsync();
+
+
 
             if (request == null)
             {
-                return NotFound(new { message = "ไม่พบคำขอความช่วยเหลือ" });
+                return NotFound(new
+                {
+                    message = "ไม่พบคำขอ"
+                });
             }
+
 
             return Ok(request);
         }
