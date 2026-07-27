@@ -425,25 +425,30 @@ namespace FloodRelief.Controllers
             }
 
 
-            var request =
-                await _context.SosRequests
-
+            var query = _context.SosRequests
                 .AsNoTracking()
+                .Where(x => x.Id == id);
 
-                .Include(x => x.Items)
-                    .ThenInclude(x => x.ReliefItem)
+            if (User.IsInRole("User"))
+            {
+                query = query.Where(x => x.UserId == userId);
+            }
+            else if (User.IsInRole("Staff"))
+            {
+                query = query.Where(x =>
+                    x.Status == SosRequestStatuses.Pending ||
+                    x.AssignedStaffId == userId
+                );
+            }
+            else if (!User.IsInRole("Admin"))
+            {
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    new { message = "คุณไม่มีสิทธิ์ดูคำขอนี้" }
+                );
+            }
 
-                .Include(x => x.Center)
-
-                .Include(x => x.AssignedStaff)
-
-
-                .Where(x =>
-                    x.Id == id &&
-                    x.UserId == userId
-                )
-
-
+            var request = await query
                 .Select(x => new SosRequestDetailDto
                 {
 
@@ -673,6 +678,15 @@ namespace FloodRelief.Controllers
              */
             else if (User.IsInRole("Admin"))
             {
+                if (string.IsNullOrWhiteSpace(dto.CenterId) ||
+                    string.IsNullOrWhiteSpace(dto.StaffId))
+                {
+                    return BadRequest(new
+                    {
+                        message = "Admin ต้องระบุศูนย์และเจ้าหน้าที่"
+                    });
+                }
+
                 var center = await _context.Centers
                     .FirstOrDefaultAsync(x =>
                         x.Id == dto.CenterId &&
@@ -1315,7 +1329,10 @@ namespace FloodRelief.Controllers
                     });
                 }
 
-                query = query.Where(x => x.CenterId == centerId);
+                query = query.Where(x =>
+                    x.CenterId == null ||
+                    x.CenterId == centerId
+                );
             }
 
             var requests = await query
