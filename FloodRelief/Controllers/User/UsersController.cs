@@ -1,120 +1,46 @@
-﻿using FloodRelief.Data;
+using FloodRelief.Data;
 using FloodRelief.DTOs.User;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using FloodRelief.Services;
 
 namespace FloodRelief.Controllers
 {
-    [Route("api/users")]
+    [Route("api/[controller]")]
     [ApiController]
     public class UsersController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly UsersService _service;
 
-        public UsersController(AppDbContext context)
+        public UsersController(UsersService service)
         {
-            _context = context;
+            _service = service;
         }
 
         [HttpGet]
         public async Task<IActionResult> GetUsers()
         {
-            var users = await _context.Users
-                .OrderByDescending(x => x.CreatedAt)
-                .Select(x => new
-                {
-                    x.Id,
-                    x.FullName,
-                    x.PhoneNumber,
-                    x.Email,
-                    x.Role,
-                    x.IsActive,
-                    x.CreatedAt,
-                    x.UpdatedAt
-                })
-                .ToListAsync();
-
-            return Ok(users);
+            return await _service.GetUsers();
         }
-
         [HttpGet("{id}")]
         public async Task<IActionResult> GetUserById(string id)
         {
-            var user = await _context.Users
-                .Where(x => x.Id == id)
-                .Select(x => new
-                {
-                    x.Id,
-                    x.FullName,
-                    x.PhoneNumber,
-                    x.Email,
-                    x.Role,
-                    x.IsActive,
-                    x.CreatedAt,
-                    x.UpdatedAt
-                })
-                .FirstOrDefaultAsync();
-
-            if (user == null)
-                return NotFound(new { message = "ไม่พบผู้ใช้" });
-
-            return Ok(user);
+            return await _service.GetUserById(id);
         }
-
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateUser(string id, [FromBody] UpdateUserRequestDto dto)
         {
-            var user = await _context.Users.FindAsync(id);
-
-            if (user == null)
-                return NotFound(new { message = "ไม่พบผู้ใช้" });
-
-            var duplicate = await _context.Users.AnyAsync(x =>
-                x.Id != id &&
-                (x.Email == dto.Email || x.PhoneNumber == dto.PhoneNumber)
-            );
-
-            if (duplicate)
-                return BadRequest(new { message = "อีเมลหรือเบอร์โทรนี้ถูกใช้งานแล้ว" });
-
-            user.FullName = dto.FullName;
-            user.PhoneNumber = dto.PhoneNumber;
-            user.Email = dto.Email;
-            user.UpdatedAt = DateTime.Now;
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = "แก้ไขข้อมูลผู้ใช้สำเร็จ" });
+            return await _service.UpdateUser(id, dto);
         }
-
         [HttpPut("{id}/status")]
         public async Task<IActionResult> UpdateUserStatus(string id, [FromBody] UpdateUserStatusDto dto)
         {
-            var user = await _context.Users.FindAsync(id);
-
-            if (user == null)
-                return NotFound(new { message = "ไม่พบผู้ใช้" });
-
-            user.IsActive = dto.IsActive;
-            user.UpdatedAt = DateTime.Now;
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = "อัปเดตสถานะผู้ใช้สำเร็จ" });
+            return await _service.UpdateUserStatus(id, dto);
         }
-
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteUser(string id)
         {
-            var user = await _context.Users.FindAsync(id);
-
-            if (user == null)
-                return NotFound(new { message = "ไม่พบผู้ใช้" });
-
-            _context.Users.Remove(user);
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = "ลบผู้ใช้สำเร็จ" });
+            return await _service.DeleteUser(id);
         }
     }
 }

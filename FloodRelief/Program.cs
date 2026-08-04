@@ -2,6 +2,11 @@ using System.Text;
 using System.Text.Json;
 using FloodRelief.Data;
 using FloodRelief.Services.Auth;
+using FloodRelief.Services.Center;
+using FloodRelief.Services.Common;
+using FloodRelief.Services;
+using FloodRelief.Services.Donations;
+using FloodRelief.Services.Weather;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -11,8 +16,22 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddScoped<JwtService>();
+builder.Services.AddScoped<CurrentUserService>();
+builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<UsersService>();
+builder.Services.AddScoped<StaffsService>();
+builder.Services.AddScoped<CentersService>();
+builder.Services.AddScoped<CenterInventoriesService>();
+builder.Services.AddScoped<DonationsService>();
+builder.Services.AddScoped<ReliefCategoriesService>();
+builder.Services.AddScoped<ReliefItemsService>();
+builder.Services.AddScoped<SosRequestsService>();
+builder.Services.AddScoped<ThaiAddressesService>();
+builder.Services.AddScoped<UploadService>();
+builder.Services.AddScoped<WeatherForecastService>();
 
 var connectionString =
     builder.Configuration.GetConnectionString("DefaultConnection")

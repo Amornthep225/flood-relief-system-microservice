@@ -29,7 +29,7 @@ namespace FloodRelief.Models
         public string AddressDetail { get; set; } = string.Empty;
 
         [StringLength(20)]
-        public string Priority { get; set; } = SosPriorities.Normal;
+        public string Priority { get; set; } = "Normal";
 
         [StringLength(30)]
         public string Status { get; set; } = SosRequestStatuses.Pending;
