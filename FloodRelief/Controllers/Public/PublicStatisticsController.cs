@@ -22,40 +22,45 @@ public class PublicStatisticsController : ControllerBase
     // GET: /api/public-statistics/home
     [HttpGet("home")]
     public async Task<ActionResult<HomeStatisticsResponseDto>>
-        GetHomeStatistics(
-            CancellationToken cancellationToken)
+        GetHomeStatistics()
     {
         /*
-         * นับผู้บริจาคไม่ซ้ำจาก UserId
+         * UserId ใน Donation ของคุณเป็น Required string
+         * จึงไม่ต้องตรวจ != null
          *
-         * ถ้า Donation ของคุณใช้ชื่อ DonorId
-         * ให้เปลี่ยน donation.UserId เป็น donation.DonorId
+         * กรองค่าว่างเผื่อมีข้อมูลเก่าในฐานข้อมูล
          */
-        var totalDonors = await _context.Donations
-            .Where(donation =>
-                donation.UserId != null)
-            .Select(donation =>
-                donation.UserId)
-            .Distinct()
-            .CountAsync(cancellationToken);
+        var totalDonors =
+            await _context.Donations
+                .AsNoTracking()
+                .Where(donation =>
+                    donation.UserId != "")
+                .Select(donation =>
+                    donation.UserId)
+                .Distinct()
+                .CountAsync();
 
         /*
-         * รองรับชื่อสถานะทั้ง Completed และ Delivered
+         * จากสถานะระบบเดิมของคุณ
+         * เคสสำเร็จอาจใช้ Completed หรือ Delivered
          */
         var completedSosRequests =
             await _context.SosRequests
-                .CountAsync(
-                    request =>
-                        request.Status == "Completed" ||
-                        request.Status == "Delivered",
-                    cancellationToken);
+                .AsNoTracking()
+                .CountAsync(request =>
+                    request.Status == "Completed" ||
+                    request.Status == "Delivered");
 
-        return Ok(
+        var response =
             new HomeStatisticsResponseDto
             {
-                TotalDonors = totalDonors,
+                TotalDonors =
+                    totalDonors,
+
                 CompletedSosRequests =
                     completedSosRequests,
-            });
+            };
+
+        return Ok(response);
     }
 }
