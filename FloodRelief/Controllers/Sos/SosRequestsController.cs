@@ -37,6 +37,15 @@ namespace FloodRelief.Controllers
         {
             return await _service.CreateSosRequest(dto);
         }
+        // POST: api/sos-requests/emergency
+        [HttpPost("emergency")]
+        [Authorize(Roles = "User")]
+        public async Task<IActionResult> CreateEmergencySosRequest(
+            [FromBody] CreateEmergencySosRequestDto dto)
+        {
+            return await _service.CreateEmergencySosRequest(dto);
+        }
+
         // GET: api/sos-requests/my
         // GET: api/sos-requests/my
         [HttpGet("my")]
@@ -120,6 +129,20 @@ namespace FloodRelief.Controllers
         string centerId)
         {
             return await _service.GetSosRequestsByCenter(centerId);
+        }
+        [HttpGet("{id}/stock-check")]
+        [Authorize(Roles = "Admin,Staff")]
+        public async Task<IActionResult> CheckStockBeforeAccept(
+        string id)
+        {
+            return await _service.CheckStockBeforeAccept(id);
+        }
+        // GET: api/sos-requests/emergency-types
+        [HttpGet("emergency-types")]
+        [AllowAnonymous]
+        public IActionResult GetEmergencyTypes()
+        {
+            return Ok(EmergencyTypes.Options);
         }
     }
 }

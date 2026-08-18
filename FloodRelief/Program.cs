@@ -7,6 +7,7 @@ using FloodRelief.Services.Common;
 using FloodRelief.Services;
 using FloodRelief.Services.Donations;
 using FloodRelief.Services.Weather;
+using FloodRelief.Services.Notification;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -32,6 +33,7 @@ builder.Services.AddScoped<SosRequestsService>();
 builder.Services.AddScoped<ThaiAddressesService>();
 builder.Services.AddScoped<UploadService>();
 builder.Services.AddScoped<WeatherForecastService>();
+builder.Services.AddScoped<NotificationsService>();
 
 var connectionString =
     builder.Configuration.GetConnectionString("DefaultConnection")

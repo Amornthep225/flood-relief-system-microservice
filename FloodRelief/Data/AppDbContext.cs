@@ -24,6 +24,9 @@ namespace FloodRelief.Data
 
         public DbSet<Donation> Donations { get; set; } = null!;
         public DbSet<DonationItem> DonationItems { get; set; } = null!;
+        public DbSet<DonationBatch> DonationBatches { get; set; } = null!;
+        public DbSet<DonationAllocation> DonationAllocations { get; set; } = null!;
+        public DbSet<Notification> Notifications { get; set; } = null!;
 
         public DbSet<CenterInventory> CenterInventories { get; set; } = null!;
         public DbSet<InventoryTransaction> InventoryTransactions { get; set; } = null!;
@@ -40,6 +43,7 @@ namespace FloodRelief.Data
 
             ConfigureSos(modelBuilder);
             ConfigureDonations(modelBuilder);
+            ConfigureDonationTraceability(modelBuilder);
             ConfigureInventory(modelBuilder);
             ConfigureThaiAddresses(modelBuilder);
         }
@@ -104,6 +108,85 @@ namespace FloodRelief.Data
                 .WithMany(x => x.Donations)
                 .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
+        }
+
+        private static void ConfigureDonationTraceability(
+            ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<DonationBatch>()
+                .HasIndex(x => x.DonationItemId)
+                .IsUnique();
+
+            modelBuilder.Entity<DonationBatch>()
+                .HasIndex(x => new
+                {
+                    x.CenterId,
+                    x.ReliefItemId,
+                    x.ReceivedAt
+                });
+
+            modelBuilder.Entity<DonationBatch>()
+                .HasOne(x => x.Donation)
+                .WithMany(x => x.Batches)
+                .HasForeignKey(x => x.DonationId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<DonationBatch>()
+                .HasOne(x => x.DonationItem)
+                .WithMany(x => x.Batches)
+                .HasForeignKey(x => x.DonationItemId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<DonationBatch>()
+                .HasOne(x => x.Center)
+                .WithMany()
+                .HasForeignKey(x => x.CenterId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<DonationBatch>()
+                .HasOne(x => x.ReliefItem)
+                .WithMany()
+                .HasForeignKey(x => x.ReliefItemId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<DonationAllocation>()
+                .HasIndex(x => new
+                {
+                    x.SosRequestId,
+                    x.DonationBatchId
+                });
+
+            modelBuilder.Entity<DonationAllocation>()
+                .HasOne(x => x.DonationBatch)
+                .WithMany(x => x.Allocations)
+                .HasForeignKey(x => x.DonationBatchId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<DonationAllocation>()
+                .HasOne(x => x.SosRequest)
+                .WithMany(x => x.DonationAllocations)
+                .HasForeignKey(x => x.SosRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<DonationAllocation>()
+                .HasOne(x => x.ReliefItem)
+                .WithMany()
+                .HasForeignKey(x => x.ReliefItemId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Notification>()
+                .HasIndex(x => new
+                {
+                    x.UserId,
+                    x.IsRead,
+                    x.CreatedAt
+                });
+
+            modelBuilder.Entity<Notification>()
+                .HasOne(x => x.User)
+                .WithMany(x => x.Notifications)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
 
         private static void ConfigureInventory(

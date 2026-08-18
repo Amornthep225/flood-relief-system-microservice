@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace FloodRelief.Models
@@ -37,5 +37,8 @@ namespace FloodRelief.Models
 
         [ForeignKey(nameof(ReliefItemId))]
         public ReliefItem? ReliefItem { get; set; }
+
+        public ICollection<DonationBatch> Batches { get; set; }
+            = new List<DonationBatch>();
     }
 }

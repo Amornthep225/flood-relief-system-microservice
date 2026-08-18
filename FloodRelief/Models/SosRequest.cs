@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using FloodRelief.Constants;
 
@@ -27,6 +27,28 @@ namespace FloodRelief.Models
         [Required]
         [StringLength(500)]
         public string AddressDetail { get; set; } = string.Empty;
+
+        [StringLength(20)]
+        public string RequestType { get; set; } = "Relief";
+
+        [StringLength(50)]
+        public string? EmergencyType { get; set; }
+
+        public int VictimCount { get; set; } = 1;
+
+        public int ChildCount { get; set; }
+
+        public int ElderlyCount { get; set; }
+
+        public int DisabledCount { get; set; }
+
+        public int PatientCount { get; set; }
+
+        [Column(TypeName = "decimal(5,2)")]
+        public decimal? WaterLevel { get; set; }
+
+        [StringLength(1000)]
+        public string? EmergencyDetail { get; set; }
 
         [StringLength(20)]
         public string Priority { get; set; } = "Normal";
@@ -65,5 +87,8 @@ namespace FloodRelief.Models
 
         public ICollection<SosRequestItem> Items { get; set; }
             = new List<SosRequestItem>();
+
+        public ICollection<DonationAllocation> DonationAllocations { get; set; }
+            = new List<DonationAllocation>();
     }
 }

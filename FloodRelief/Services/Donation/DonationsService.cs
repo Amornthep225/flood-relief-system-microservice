@@ -292,6 +292,31 @@ namespace FloodRelief.Services.Donations
 
                             Quantity = item.Quantity,
 
+                            ForwardedQuantity = item.Batches
+                                .SelectMany(batch => batch.Allocations)
+                                .Where(allocation =>
+                                    allocation.SosRequest.Status == "Completed"
+                                )
+                                .Sum(allocation => (int?)allocation.Quantity)
+                                ?? 0,
+
+                            InTransitQuantity = item.Batches
+                                .SelectMany(batch => batch.Allocations)
+                                .Where(allocation =>
+                                    allocation.SosRequest.Status == "Delivering"
+                                )
+                                .Sum(allocation => (int?)allocation.Quantity)
+                                ?? 0,
+
+                            RemainingQuantity = item.Quantity -
+                                (item.Batches
+                                    .SelectMany(batch => batch.Allocations)
+                                    .Where(allocation =>
+                                        allocation.SosRequest.Status == "Completed" ||
+                                        allocation.SosRequest.Status == "Delivering"
+                                    )
+                                    .Sum(allocation => (int?)allocation.Quantity)
+                                    ?? 0),
 
                             Unit = item.Unit
                         })
@@ -678,6 +703,19 @@ namespace FloodRelief.Services.Donations
                         x => x.Id,
                         "InventoryTransaction");
 
+                var nextBatchId =
+                    await PrimaryKeyHelper.GenerateNextIdAsync(
+                        _context.DonationBatches,
+                        x => x.Id,
+                        "DonationBatch");
+
+                var nextNotificationId =
+                    await PrimaryKeyHelper.GenerateNextIdAsync(
+                        _context.Notifications,
+                        x => x.Id,
+                        "Notification");
+
+                var receivedAt = DateTime.Now;
                 var receivedItems = new List<object>();
 
                 foreach (var donationItem in donation.Items)
@@ -788,10 +826,30 @@ namespace FloodRelief.Services.Donations
                         inventoryTransaction
                     );
 
+                    _context.DonationBatches.Add(
+                        new DonationBatch
+                        {
+                            Id = nextBatchId,
+                            DonationId = donation.Id,
+                            DonationItemId = donationItem.Id,
+                            CenterId = donation.CenterId,
+                            ReliefItemId = donationItem.ReliefItemId,
+                            ReceivedQuantity = donationItem.Quantity,
+                            RemainingQuantity = donationItem.Quantity,
+                            ReceivedAt = receivedAt
+                        }
+                    );
+
                     nextTransactionId =
                         PrimaryKeyHelper.IncrementId(
                             nextTransactionId,
                             "InventoryTransaction"
+                        );
+
+                    nextBatchId =
+                        PrimaryKeyHelper.IncrementId(
+                            nextBatchId,
+                            "DonationBatch"
                         );
 
                     receivedItems.Add(new
@@ -805,7 +863,23 @@ namespace FloodRelief.Services.Donations
                 }
 
                 donation.Status = "Received";
-                donation.UpdatedAt = DateTime.Now;
+                donation.UpdatedAt = receivedAt;
+
+                _context.Notifications.Add(
+                    new FloodRelief.Models.Notification
+                    {
+                        Id = nextNotificationId,
+                        UserId = donation.UserId,
+                        Type = "DonationReceived",
+                        Title = "ศูนย์ได้รับของบริจาคแล้ว",
+                        Message =
+                            $"ของบริจาค #{donation.Id} ถูกรับเข้าศูนย์เรียบร้อยแล้ว ขอบคุณที่ร่วมส่งต่อความช่วยเหลือ",
+                        ReferenceType = "Donation",
+                        ReferenceId = donation.Id,
+                        IsRead = false,
+                        CreatedAt = receivedAt
+                    }
+                );
 
                 await _context.SaveChangesAsync();
 

@@ -26,7 +26,7 @@ namespace FloodRelief.Services.Center
         // ดูของทั้งหมดในศูนย์
         // GET /api/inventories/center/00001
         public async Task<IActionResult> GetCenterInventory(
-            string centerId)
+    string centerId)
         {
             var centerExists =
                 await _context.Centers
@@ -55,12 +55,23 @@ namespace FloodRelief.Services.Center
                     {
                         x.Id,
                         x.CenterId,
+
                         centerName =
                             x.Center.CenterName,
 
                         x.ReliefItemId,
+
                         reliefItemName =
                             x.ReliefItem.Name,
+
+                        // เพิ่มตรงนี้
+                        categoryName =
+                            x.ReliefItem.ReliefCategory != null
+                                ? x.ReliefItem.ReliefCategory.Name
+                                : "อื่น ๆ",
+
+                        categoryId =
+                            x.ReliefItem.ReliefCategoryId,
 
                         unit =
                             x.ReliefItem.Unit,
@@ -86,7 +97,7 @@ namespace FloodRelief.Services.Center
 
         // ดูของรายการเดียวในศูนย์
         // GET /api/inventories/center/00001/item/0000000001
-            //"center/{centerId}/item/{reliefItemId}"
+        //"center/{centerId}/item/{reliefItemId}"
         //)]
         public async Task<IActionResult>
             GetCenterInventoryItem(

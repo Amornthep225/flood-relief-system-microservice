@@ -37,8 +37,6 @@ namespace FloodRelief.DTOs.Sos
             1,
             ErrorMessage = "กรุณาเลือกรายการสิ่งของอย่างน้อย 1 รายการ"
         )]
-        public string Priority { get; set; } = "Normal";
-
         public List<CreateSosRequestItemDto> Items { get; set; } = new();
     }
 }

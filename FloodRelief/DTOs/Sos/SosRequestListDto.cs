@@ -1,4 +1,4 @@
-﻿namespace FloodRelief.DTOs.Sos
+namespace FloodRelief.DTOs.Sos
 {
     public class SosRequestListDto
     {
@@ -23,6 +23,24 @@
 
         public string AddressDetail { get; set; } = string.Empty;
 
+        public string RequestType { get; set; } = "Relief";
+
+        public string? EmergencyType { get; set; }
+
+        public int VictimCount { get; set; }
+
+        public int ChildCount { get; set; }
+
+        public int ElderlyCount { get; set; }
+
+        public int DisabledCount { get; set; }
+
+        public int PatientCount { get; set; }
+
+        public decimal? WaterLevel { get; set; }
+
+        public string? EmergencyDetail { get; set; }
+
         public string Priority { get; set; } = string.Empty;
 
         public string Status { get; set; } = string.Empty;
@@ -30,5 +48,7 @@
         public DateTime CreatedAt { get; set; }
 
         public DateTime? UpdatedAt { get; set; }
+
+        public List<SosRequestItemDto> Items { get; set; } = new();
     }
 }

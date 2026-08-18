@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace FloodRelief.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class AddTable : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -148,6 +148,40 @@ namespace FloodRelief.Migrations
                         name: "FK_relief_items_relief_categories_ReliefCategoryId",
                         column: x => x.ReliefCategoryId,
                         principalTable: "relief_categories",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "notifications",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "varchar(10)", maxLength: 10, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    UserId = table.Column<string>(type: "varchar(10)", maxLength: 10, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Type = table.Column<string>(type: "varchar(40)", maxLength: 40, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Title = table.Column<string>(type: "varchar(150)", maxLength: 150, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Message = table.Column<string>(type: "varchar(500)", maxLength: 500, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    ReferenceType = table.Column<string>(type: "varchar(30)", maxLength: 30, nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    ReferenceId = table.Column<string>(type: "varchar(10)", maxLength: 10, nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    IsRead = table.Column<bool>(type: "tinyint(1)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    ReadAt = table.Column<DateTime>(type: "datetime(6)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_notifications", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_notifications_users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 })
@@ -466,6 +500,18 @@ namespace FloodRelief.Migrations
                     Longitude = table.Column<double>(type: "double", nullable: false),
                     AddressDetail = table.Column<string>(type: "varchar(500)", maxLength: 500, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
+                    RequestType = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    EmergencyType = table.Column<string>(type: "varchar(50)", maxLength: 50, nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    VictimCount = table.Column<int>(type: "int", nullable: false),
+                    ChildCount = table.Column<int>(type: "int", nullable: false),
+                    ElderlyCount = table.Column<int>(type: "int", nullable: false),
+                    DisabledCount = table.Column<int>(type: "int", nullable: false),
+                    PatientCount = table.Column<int>(type: "int", nullable: false),
+                    WaterLevel = table.Column<decimal>(type: "decimal(5,2)", nullable: true),
+                    EmergencyDetail = table.Column<string>(type: "varchar(1000)", maxLength: 1000, nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
                     Priority = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     Status = table.Column<string>(type: "varchar(30)", maxLength: 30, nullable: false)
@@ -507,6 +553,54 @@ namespace FloodRelief.Migrations
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateTable(
+                name: "donation_batches",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "varchar(10)", maxLength: 10, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    DonationId = table.Column<string>(type: "varchar(10)", maxLength: 10, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    DonationItemId = table.Column<string>(type: "varchar(10)", maxLength: 10, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    CenterId = table.Column<string>(type: "varchar(5)", maxLength: 5, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    ReliefItemId = table.Column<string>(type: "varchar(10)", maxLength: 10, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    ReceivedQuantity = table.Column<int>(type: "int", nullable: false),
+                    RemainingQuantity = table.Column<int>(type: "int", nullable: false),
+                    ReceivedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_donation_batches", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_donation_batches_centers_CenterId",
+                        column: x => x.CenterId,
+                        principalTable: "centers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_donation_batches_donation_items_DonationItemId",
+                        column: x => x.DonationItemId,
+                        principalTable: "donation_items",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_donation_batches_donations_DonationId",
+                        column: x => x.DonationId,
+                        principalTable: "donations",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_donation_batches_relief_items_ReliefItemId",
+                        column: x => x.ReliefItemId,
+                        principalTable: "relief_items",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
                 name: "sos_request_items",
                 columns: table => new
                 {
@@ -532,6 +626,45 @@ namespace FloodRelief.Migrations
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_sos_request_items_sos_requests_SosRequestId",
+                        column: x => x.SosRequestId,
+                        principalTable: "sos_requests",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "donation_allocations",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "varchar(10)", maxLength: 10, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    DonationBatchId = table.Column<string>(type: "varchar(10)", maxLength: 10, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    SosRequestId = table.Column<string>(type: "varchar(10)", maxLength: 10, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    ReliefItemId = table.Column<string>(type: "varchar(10)", maxLength: 10, nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Quantity = table.Column<int>(type: "int", nullable: false),
+                    AllocatedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_donation_allocations", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_donation_allocations_donation_batches_DonationBatchId",
+                        column: x => x.DonationBatchId,
+                        principalTable: "donation_batches",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_donation_allocations_relief_items_ReliefItemId",
+                        column: x => x.ReliefItemId,
+                        principalTable: "relief_items",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_donation_allocations_sos_requests_SosRequestId",
                         column: x => x.SosRequestId,
                         principalTable: "sos_requests",
                         principalColumn: "Id",
@@ -571,6 +704,42 @@ namespace FloodRelief.Migrations
                 column: "province_id");
 
             migrationBuilder.CreateIndex(
+                name: "IX_donation_allocations_DonationBatchId",
+                table: "donation_allocations",
+                column: "DonationBatchId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_donation_allocations_ReliefItemId",
+                table: "donation_allocations",
+                column: "ReliefItemId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_donation_allocations_SosRequestId_DonationBatchId",
+                table: "donation_allocations",
+                columns: new[] { "SosRequestId", "DonationBatchId" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_donation_batches_CenterId_ReliefItemId_ReceivedAt",
+                table: "donation_batches",
+                columns: new[] { "CenterId", "ReliefItemId", "ReceivedAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_donation_batches_DonationId",
+                table: "donation_batches",
+                column: "DonationId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_donation_batches_DonationItemId",
+                table: "donation_batches",
+                column: "DonationItemId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_donation_batches_ReliefItemId",
+                table: "donation_batches",
+                column: "ReliefItemId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_donation_items_DonationId",
                 table: "donation_items",
                 column: "DonationId");
@@ -599,6 +768,11 @@ namespace FloodRelief.Migrations
                 name: "IX_inventory_transactions_StaffId",
                 table: "inventory_transactions",
                 column: "StaffId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_notifications_UserId_IsRead_CreatedAt",
+                table: "notifications",
+                columns: new[] { "UserId", "IsRead", "CreatedAt" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_provinces_geography_id",
@@ -658,16 +832,19 @@ namespace FloodRelief.Migrations
                 name: "admins");
 
             migrationBuilder.DropTable(
-                name: "donation_items");
+                name: "donation_allocations");
 
             migrationBuilder.DropTable(
                 name: "inventory_transactions");
 
             migrationBuilder.DropTable(
+                name: "notifications");
+
+            migrationBuilder.DropTable(
                 name: "sos_request_items");
 
             migrationBuilder.DropTable(
-                name: "donations");
+                name: "donation_batches");
 
             migrationBuilder.DropTable(
                 name: "center_inventories");
@@ -676,19 +853,25 @@ namespace FloodRelief.Migrations
                 name: "sos_requests");
 
             migrationBuilder.DropTable(
-                name: "relief_items");
+                name: "donation_items");
 
             migrationBuilder.DropTable(
                 name: "staffs");
+
+            migrationBuilder.DropTable(
+                name: "donations");
+
+            migrationBuilder.DropTable(
+                name: "relief_items");
+
+            migrationBuilder.DropTable(
+                name: "centers");
 
             migrationBuilder.DropTable(
                 name: "users");
 
             migrationBuilder.DropTable(
                 name: "relief_categories");
-
-            migrationBuilder.DropTable(
-                name: "centers");
 
             migrationBuilder.DropTable(
                 name: "sub_districts");

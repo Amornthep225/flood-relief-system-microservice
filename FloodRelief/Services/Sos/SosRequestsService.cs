@@ -1,4 +1,4 @@
-using FloodRelief.Services.Common;
+﻿using FloodRelief.Services.Common;
 using FloodRelief.Helpers;
 using System.Data;
 using System.Security.Claims;
@@ -194,20 +194,6 @@ namespace FloodRelief.Services
                 await _context.Database.BeginTransactionAsync(
                     IsolationLevel.Serializable
                 );
-            var allowedPriorities = new[]
-{
-                "Normal",
-                "Urgent",
-                "Critical"
-};
-
-            if (!allowedPriorities.Contains(dto.Priority))
-            {
-                return BadRequest(new
-                {
-                    message = "ระดับความเร่งด่วนไม่ถูกต้อง"
-                });
-            }
             try
             {
                 var requestId = await PrimaryKeyHelper.GenerateNextIdAsync(
@@ -219,13 +205,14 @@ namespace FloodRelief.Services
                 {
                     Id = requestId,
                     UserId = userId,
+                    RequestType = "Relief",
                     CenterId = null,
                     AssignedStaffId = null,
                     Latitude = dto.Latitude,
                     Longitude = dto.Longitude,
                     AddressDetail = dto.AddressDetail.Trim(),
                     UserRemark = dto.UserRemark?.Trim(),
-                    Priority = dto.Priority,
+                    Priority = SosPriorities.Normal,
                     Status = SosRequestStatuses.Pending,
                     CreatedAt = DateTime.Now
                 };
@@ -281,6 +268,175 @@ namespace FloodRelief.Services
             }
         }
 
+
+        public async Task<IActionResult> CreateEmergencySosRequest(
+            CreateEmergencySosRequestDto dto)
+        {
+            var userId = _currentUser.UserId;
+
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return Unauthorized(new
+                {
+                    message = "ไม่พบข้อมูลผู้ใช้จาก Token"
+                });
+            }
+
+            var userExists = await _context.Users
+                .AnyAsync(x => x.Id == userId && x.IsActive);
+
+            if (!userExists)
+            {
+                return Unauthorized(new
+                {
+                    message = "ไม่พบบัญชีผู้ใช้ หรือบัญชีถูกระงับ"
+                });
+            }
+
+            if (!EmergencyTypes.All.Contains(dto.EmergencyType))
+            {
+                return BadRequest(new
+                {
+                    message = "ประเภทเหตุฉุกเฉินไม่ถูกต้อง"
+                });
+            }
+
+            if (dto.Latitude == 0 && dto.Longitude == 0)
+            {
+                return BadRequest(new
+                {
+                    message = "กรุณาปักหมุดตำแหน่งเหตุฉุกเฉิน"
+                });
+            }
+
+            var vulnerableTotal =
+                dto.ChildCount +
+                dto.ElderlyCount +
+                dto.DisabledCount +
+                dto.PatientCount;
+
+            if (vulnerableTotal > dto.VictimCount)
+            {
+                return BadRequest(new
+                {
+                    message = "จำนวนเด็ก ผู้สูงอายุ ผู้พิการ และผู้ป่วยรวมกันต้องไม่เกินจำนวนผู้ประสบภัยทั้งหมด"
+                });
+            }
+
+            await using var transaction =
+                await _context.Database.BeginTransactionAsync(
+                    IsolationLevel.Serializable
+                );
+
+            try
+            {
+                var requestId = await PrimaryKeyHelper.GenerateNextIdAsync(
+                    _context.SosRequests,
+                    x => x.Id,
+                    "SosRequest");
+
+                var request = new SosRequest
+                {
+                    Id = requestId,
+                    UserId = userId,
+                    RequestType = "Emergency",
+                    CenterId = null,
+                    AssignedStaffId = null,
+                    Latitude = dto.Latitude,
+                    Longitude = dto.Longitude,
+                    AddressDetail = dto.AddressDetail.Trim(),
+                    EmergencyType = dto.EmergencyType,
+                    VictimCount = dto.VictimCount,
+                    ChildCount = dto.ChildCount,
+                    ElderlyCount = dto.ElderlyCount,
+                    DisabledCount = dto.DisabledCount,
+                    PatientCount = dto.PatientCount,
+                    WaterLevel = dto.WaterLevel,
+                    EmergencyDetail = dto.EmergencyDetail.Trim(),
+                    UserRemark = dto.EmergencyDetail.Trim(),
+                    Priority = SosPriorities.Critical,
+                    Status = SosRequestStatuses.Pending,
+                    CreatedAt = DateTime.Now
+                };
+
+                _context.SosRequests.Add(request);
+
+                var nextNotificationId =
+                    await PrimaryKeyHelper.GenerateNextIdAsync(
+                        _context.Notifications,
+                        x => x.Id,
+                        "Notification");
+
+                _context.Notifications.Add(
+                    new FloodRelief.Models.Notification
+                    {
+                        Id = nextNotificationId,
+                        UserId = request.UserId,
+                        Type = "SosCreated",
+                        Title = "ระบบได้รับ SOS ของคุณแล้ว",
+                        Message =
+                            $"ระบบได้รับเคส SOS #{request.Id} และกำลังส่งข้อมูลไปยังเจ้าหน้าที่ กรุณาอยู่ในจุดที่ปลอดภัย",
+                        ReferenceType = "SosRequest",
+                        ReferenceId = request.Id,
+                        IsRead = false,
+                        CreatedAt = request.CreatedAt
+                    }
+                );
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return CreatedAtAction(
+                    nameof(GetSosRequestById),
+                    new { id = request.Id },
+                    new
+                    {
+                        message = "ส่ง SOS ฉุกเฉินสำเร็จ",
+                        sosRequestId = request.Id,
+                        requestType = request.RequestType,
+                        emergencyType = request.EmergencyType,
+                        priority = request.Priority,
+                        status = request.Status,
+                        createdAt = request.CreatedAt
+                    }
+                );
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
+
+        private static string DetermineEmergencyPriority(
+            CreateEmergencySosRequestDto dto)
+        {
+            if (
+                dto.EmergencyType == EmergencyTypes.Medical ||
+                dto.EmergencyType == EmergencyTypes.Injured ||
+                dto.EmergencyType == EmergencyTypes.RoofTrapped ||
+                dto.PatientCount > 0 ||
+                dto.DisabledCount > 0 ||
+                dto.WaterLevel >= 1.5m)
+            {
+                return SosPriorities.Critical;
+            }
+
+            if (
+                dto.EmergencyType == EmergencyTypes.Trapped ||
+                dto.EmergencyType == EmergencyTypes.RapidFlood ||
+                dto.EmergencyType == EmergencyTypes.Evacuation ||
+                dto.ElderlyCount > 0 ||
+                dto.ChildCount > 0 ||
+                dto.VictimCount >= 5 ||
+                dto.WaterLevel >= 0.5m)
+            {
+                return SosPriorities.Urgent;
+            }
+
+            return SosPriorities.Normal;
+        }
+
         // GET: api/sos-requests/my
         // GET: api/sos-requests/my
         public async Task<IActionResult> GetMySosRequests(
@@ -296,9 +452,9 @@ namespace FloodRelief.Services
                     message = "ไม่พบข้อมูลผู้ใช้จาก Token"
                 });
             }
-          var query = _context.SosRequests
-                .AsNoTracking()
-                .Where(x => x.UserId == userId);
+            var query = _context.SosRequests
+                  .AsNoTracking()
+                  .Where(x => x.UserId == userId);
             // วันที่เริ่มต้น
             if (startDate.HasValue)
             {
@@ -355,6 +511,23 @@ namespace FloodRelief.Services
                     Longitude = x.Longitude,
                     AddressDetail =
                         x.AddressDetail,
+                    RequestType = x.RequestType,
+                    EmergencyType = x.EmergencyType,
+                    VictimCount = x.VictimCount,
+                    ChildCount = x.ChildCount,
+                    ElderlyCount = x.ElderlyCount,
+                    DisabledCount = x.DisabledCount,
+                    PatientCount = x.PatientCount,
+                    WaterLevel = x.WaterLevel,
+                    EmergencyDetail = x.EmergencyDetail,
+                    Items = x.Items.Select(i => new SosRequestItemDto
+                    {
+                        Id = i.Id,
+                        ReliefItemId = i.ReliefItemId,
+                        ReliefItemName = i.ReliefItem != null ? i.ReliefItem.Name : "ไม่ระบุ",
+                        Quantity = i.Quantity,
+                        Unit = i.Unit
+                    }).ToList(),
                     Priority =
                         x.Priority,
                     Status =
@@ -417,6 +590,15 @@ namespace FloodRelief.Services
         x.Latitude,
         x.Longitude,
         x.AddressDetail,
+        x.RequestType,
+        x.EmergencyType,
+        x.VictimCount,
+        x.ChildCount,
+        x.ElderlyCount,
+        x.DisabledCount,
+        x.PatientCount,
+        x.WaterLevel,
+        x.EmergencyDetail,
         x.Priority,
         x.Status,
         x.CreatedAt
@@ -539,6 +721,15 @@ namespace FloodRelief.Services
 
                     AddressDetail = x.AddressDetail,
 
+                    RequestType = x.RequestType,
+                    EmergencyType = x.EmergencyType,
+                    VictimCount = x.VictimCount,
+                    ChildCount = x.ChildCount,
+                    ElderlyCount = x.ElderlyCount,
+                    DisabledCount = x.DisabledCount,
+                    PatientCount = x.PatientCount,
+                    WaterLevel = x.WaterLevel,
+                    EmergencyDetail = x.EmergencyDetail,
 
                     Priority = x.Priority,
 
@@ -749,6 +940,39 @@ namespace FloodRelief.Services
             request.AcceptedAt = now;
             request.UpdatedAt = now;
 
+            var isEmergencyRequest = string.Equals(
+                request.RequestType,
+                "Emergency",
+                StringComparison.OrdinalIgnoreCase
+            );
+
+            var nextNotificationId =
+                await PrimaryKeyHelper.GenerateNextIdAsync(
+                    _context.Notifications,
+                    x => x.Id,
+                    "Notification");
+
+            _context.Notifications.Add(
+                new FloodRelief.Models.Notification
+                {
+                    Id = nextNotificationId,
+                    UserId = request.UserId,
+                    Type = isEmergencyRequest
+                        ? "SosAccepted"
+                        : "ReliefAccepted",
+                    Title = isEmergencyRequest
+                        ? "เจ้าหน้าที่รับเคส SOS ของคุณแล้ว"
+                        : "เจ้าหน้าที่รับคำขอของคุณแล้ว",
+                    Message = isEmergencyRequest
+                        ? $"เคส SOS #{request.Id} มีเจ้าหน้าที่รับผิดชอบแล้ว กรุณาติดตามสถานะเพื่อรอการเข้าช่วยเหลือ"
+                        : $"คำขอรับสิ่งของ #{request.Id} มีเจ้าหน้าที่รับเรื่องแล้ว และกำลังดำเนินการตามคำขอของคุณ",
+                    ReferenceType = "SosRequest",
+                    ReferenceId = request.Id,
+                    IsRead = false,
+                    CreatedAt = now
+                }
+            );
+
             await _context.SaveChangesAsync();
 
             return Ok(new
@@ -887,6 +1111,62 @@ namespace FloodRelief.Services
                     });
                 }
 
+                var isEmergencyRequest = string.Equals(
+                    request.RequestType,
+                    "Emergency",
+                    StringComparison.OrdinalIgnoreCase
+                );
+
+                /*
+                 * Emergency SOS ไม่มีรายการสิ่งของและไม่ต้องตัด Inventory
+                 * เมื่อเข้าสู่ Delivering ให้ตีความว่าเจ้าหน้าที่กำลังเดินทาง
+                 */
+                if (isEmergencyRequest)
+                {
+                    var emergencyDeliveringAt = DateTime.Now;
+
+                    request.Status = SosRequestStatuses.Delivering;
+                    request.StaffRemark = dto.StaffRemark?.Trim();
+                    request.DeliveringAt = emergencyDeliveringAt;
+                    request.UpdatedAt = emergencyDeliveringAt;
+
+                    var emergencyNotificationId =
+                        await PrimaryKeyHelper.GenerateNextIdAsync(
+                            _context.Notifications,
+                            x => x.Id,
+                            "Notification");
+
+                    _context.Notifications.Add(
+                        new FloodRelief.Models.Notification
+                        {
+                            Id = emergencyNotificationId,
+                            UserId = request.UserId,
+                            Type = "SosResponderOnTheWay",
+                            Title = "เจ้าหน้าที่กำลังเดินทางไปยังตำแหน่งของคุณ",
+                            Message =
+                                $"เจ้าหน้าที่กำลังเดินทางไปช่วยเหลือเคส SOS #{request.Id} กรุณาอยู่ในจุดที่ปลอดภัยและติดตามสถานะ",
+                            ReferenceType = "SosRequest",
+                            ReferenceId = request.Id,
+                            IsRead = false,
+                            CreatedAt = emergencyDeliveringAt
+                        }
+                    );
+
+                    await _context.SaveChangesAsync();
+
+                    return Ok(new
+                    {
+                        message = "อัปเดตสถานะเป็นเจ้าหน้าที่กำลังเดินทางสำเร็จ",
+                        data = new
+                        {
+                            request.Id,
+                            request.Status,
+                            request.DeliveringAt,
+                            request.UpdatedAt
+                        }
+                    });
+                }
+
                 if (request.Items.Count == 0)
                 {
                     return BadRequest(new
@@ -981,6 +1261,12 @@ namespace FloodRelief.Services
                             x => x.Id,
                             "InventoryTransaction");
 
+                    var nextAllocationId =
+                        await PrimaryKeyHelper.GenerateNextIdAsync(
+                            _context.DonationAllocations,
+                            x => x.Id,
+                            "DonationAllocation");
+
                     var now = DateTime.Now;
 
                     foreach (var requestedItem in requestedItems)
@@ -1034,6 +1320,69 @@ namespace FloodRelief.Services
                                 nextTransactionId,
                                 "InventoryTransaction"
                             );
+
+                        /*
+                         * ผูกสต็อกที่จ่ายออกกับล็อต Donation แบบ FIFO
+                         * เฉพาะคำขอรับสิ่งของ (Relief) เท่านั้น
+                         *
+                         * ถ้าเป็นสต็อกเก่าที่ไม่มี DonationBatch ระบบยังจ่ายได้ตาม
+                         * CenterInventory แต่จะไม่อ้างว่าเป็นของผู้บริจาครายใด
+                         */
+                        {
+                            var remainingToTrace =
+                                requestedItem.Quantity;
+
+                            var donationBatches = await _context.DonationBatches
+                                .Include(x => x.Donation)
+                                .Include(x => x.ReliefItem)
+                                .Where(x =>
+                                    x.CenterId == request.CenterId &&
+                                    x.ReliefItemId == requestedItem.ReliefItemId &&
+                                    x.RemainingQuantity > 0
+                                )
+                                .OrderBy(x => x.ReceivedAt)
+                                .ThenBy(x => x.Id)
+                                .ToListAsync();
+
+                            foreach (var batch in donationBatches)
+                            {
+                                if (remainingToTrace <= 0)
+                                {
+                                    break;
+                                }
+
+                                var allocatedQuantity = Math.Min(
+                                    batch.RemainingQuantity,
+                                    remainingToTrace
+                                );
+
+                                if (allocatedQuantity <= 0)
+                                {
+                                    continue;
+                                }
+
+                                batch.RemainingQuantity -= allocatedQuantity;
+                                remainingToTrace -= allocatedQuantity;
+
+                                _context.DonationAllocations.Add(
+                                    new DonationAllocation
+                                    {
+                                        Id = nextAllocationId,
+                                        DonationBatchId = batch.Id,
+                                        SosRequestId = request.Id,
+                                        ReliefItemId = requestedItem.ReliefItemId,
+                                        Quantity = allocatedQuantity,
+                                        AllocatedAt = now
+                                    }
+                                );
+
+                                nextAllocationId =
+                                    PrimaryKeyHelper.IncrementId(
+                                        nextAllocationId,
+                                        "DonationAllocation"
+                                    );
+                            }
+                        }
                     }
 
                     request.Status =
@@ -1044,6 +1393,120 @@ namespace FloodRelief.Services
 
                     request.DeliveringAt = now;
                     request.UpdatedAt = now;
+
+                    // บันทึก Inventory + Allocation ก่อน เพื่อให้ query trace ได้ใน transaction เดียวกัน
+                    await _context.SaveChangesAsync();
+
+                    var nextNotificationId =
+                        await PrimaryKeyHelper.GenerateNextIdAsync(
+                            _context.Notifications,
+                            x => x.Id,
+                            "Notification");
+
+                    // แจ้งผู้ขอรับของว่าสิ่งของกำลังนำส่ง
+                    _context.Notifications.Add(
+                        new FloodRelief.Models.Notification
+                        {
+                            Id = nextNotificationId,
+                            UserId = request.UserId,
+                            Type = "ReliefDelivering",
+                            Title = "สิ่งของกำลังเดินทางไปหาคุณ",
+                            Message =
+                                $"คำขอรับสิ่งของ #{request.Id} กำลังนำส่งไปยังตำแหน่งที่คุณระบุ กรุณาเตรียมรับสิ่งของ",
+                            ReferenceType = "SosRequest",
+                            ReferenceId = request.Id,
+                            IsRead = false,
+                            CreatedAt = now
+                        }
+                    );
+
+                    nextNotificationId =
+                        PrimaryKeyHelper.IncrementId(
+                            nextNotificationId,
+                            "Notification"
+                        );
+
+                    // แจ้งผู้บริจาคเฉพาะล็อตที่ถูก allocate ให้เคสนี้จริง ๆ
+                    var inTransitAllocations = await _context.DonationAllocations
+                        .Where(x => x.SosRequestId == request.Id)
+                        .Include(x => x.DonationBatch)
+                            .ThenInclude(x => x.Donation)
+                        .Include(x => x.ReliefItem)
+                        .ToListAsync();
+
+                    var donorInTransitGroups = inTransitAllocations
+                        .Where(x =>
+                            x.DonationBatch?.Donation != null &&
+                            !string.IsNullOrWhiteSpace(
+                                x.DonationBatch.Donation.UserId
+                            )
+                        )
+                        .GroupBy(x => new
+                        {
+                            DonationId = x.DonationBatch.DonationId,
+                            UserId = x.DonationBatch.Donation.UserId
+                        })
+                        .ToList();
+
+                    foreach (var donorGroup in donorInTransitGroups)
+                    {
+                        var itemSummaries = donorGroup
+                            .GroupBy(x => new
+                            {
+                                x.ReliefItemId,
+                                Name = x.ReliefItem != null
+                                    ? x.ReliefItem.Name
+                                    : x.ReliefItemId,
+                                Unit = x.ReliefItem != null
+                                    ? x.ReliefItem.Unit
+                                    : string.Empty
+                            })
+                            .Select(group =>
+                                $"{group.Key.Name} {group.Sum(x => x.Quantity)} {group.Key.Unit}".Trim()
+                            )
+                            .ToList();
+
+                        var visibleItems = string.Join(
+                            ", ",
+                            itemSummaries.Take(3)
+                        );
+
+                        if (itemSummaries.Count > 3)
+                        {
+                            visibleItems +=
+                                $" และอีก {itemSummaries.Count - 3} รายการ";
+                        }
+
+                        var donorMessage =
+                            $"{visibleItems} จากการบริจาค #{donorGroup.Key.DonationId} กำลังถูกนำไปช่วยเหลือในเคส #{request.Id}";
+
+                        if (donorMessage.Length > 500)
+                        {
+                            donorMessage =
+                                donorMessage[..497] + "...";
+                        }
+
+                        _context.Notifications.Add(
+                            new FloodRelief.Models.Notification
+                            {
+                                Id = nextNotificationId,
+                                UserId = donorGroup.Key.UserId,
+                                Type = "DonationInTransit",
+                                Title = "สิ่งของของคุณกำลังถูกส่งต่อ",
+                                Message = donorMessage,
+                                ReferenceType = "Donation",
+                                ReferenceId = donorGroup.Key.DonationId,
+                                IsRead = false,
+                                CreatedAt = now
+                            }
+                        );
+
+                        nextNotificationId =
+                            PrimaryKeyHelper.IncrementId(
+                                nextNotificationId,
+                                "Notification"
+                            );
+                    }
 
                     await _context.SaveChangesAsync();
                     await transaction.CommitAsync();
@@ -1092,6 +1555,150 @@ namespace FloodRelief.Services
 
                 case SosRequestStatuses.Completed:
                     request.CompletedAt = updatedAt;
+
+                    var isEmergencyCompleted = string.Equals(
+                        request.RequestType,
+                        "Emergency",
+                        StringComparison.OrdinalIgnoreCase
+                    );
+
+                    var nextCompletedNotificationId =
+                        await PrimaryKeyHelper.GenerateNextIdAsync(
+                            _context.Notifications,
+                            x => x.Id,
+                            "Notification");
+
+                    // แจ้งเจ้าของคำขอเมื่อเคสเสร็จสิ้น
+                    _context.Notifications.Add(
+                        new FloodRelief.Models.Notification
+                        {
+                            Id = nextCompletedNotificationId,
+                            UserId = request.UserId,
+                            Type = isEmergencyCompleted
+                                ? "SosCompleted"
+                                : "ReliefCompleted",
+                            Title = isEmergencyCompleted
+                                ? "เคส SOS ได้รับการช่วยเหลือเรียบร้อยแล้ว"
+                                : "ส่งมอบสิ่งของเรียบร้อยแล้ว",
+                            Message = isEmergencyCompleted
+                                ? $"เคส SOS #{request.Id} ถูกปิดหลังจากดำเนินการช่วยเหลือเรียบร้อยแล้ว"
+                                : $"คำขอรับสิ่งของ #{request.Id} ถูกส่งมอบเรียบร้อยแล้ว ขอบคุณที่ใช้ระบบ Flood Relief",
+                            ReferenceType = "SosRequest",
+                            ReferenceId = request.Id,
+                            IsRead = false,
+                            CreatedAt = updatedAt
+                        }
+                    );
+
+                    nextCompletedNotificationId =
+                        PrimaryKeyHelper.IncrementId(
+                            nextCompletedNotificationId,
+                            "Notification"
+                        );
+
+                    /*
+                     * เมื่อช่วยเหลือสำเร็จ ให้แจ้งเฉพาะผู้บริจาคที่ล็อตของเขา
+                     * ถูก allocate ให้คำขอนี้จริง ๆ โดยไม่เปิดเผยข้อมูลส่วนตัว
+                     * ของผู้ประสบภัย
+                     */
+                    var completedAllocations = await _context.DonationAllocations
+                        .Where(x => x.SosRequestId == request.Id)
+                        .Include(x => x.DonationBatch)
+                            .ThenInclude(x => x.Donation)
+                        .Include(x => x.ReliefItem)
+                        .ToListAsync();
+
+                    var donorGroups = completedAllocations
+                        .Where(x =>
+                            x.DonationBatch?.Donation != null &&
+                            !string.IsNullOrWhiteSpace(
+                                x.DonationBatch.Donation.UserId
+                            )
+                        )
+                        .GroupBy(x => new
+                        {
+                            DonationId = x.DonationBatch.DonationId,
+                            UserId = x.DonationBatch.Donation.UserId
+                        })
+                        .ToList();
+
+                    if (donorGroups.Count > 0)
+                    {
+                        foreach (var donorGroup in donorGroups)
+                        {
+                            var alreadyNotified =
+                                await _context.Notifications.AnyAsync(x =>
+                                    x.UserId == donorGroup.Key.UserId &&
+                                    x.Type == "DonationDelivered" &&
+                                    x.ReferenceType == "Donation" &&
+                                    x.ReferenceId == donorGroup.Key.DonationId &&
+                                    x.Message.Contains(request.Id)
+                                );
+
+                            if (alreadyNotified)
+                            {
+                                continue;
+                            }
+
+                            var itemSummaries = donorGroup
+                                .GroupBy(x => new
+                                {
+                                    x.ReliefItemId,
+                                    Name = x.ReliefItem != null
+                                        ? x.ReliefItem.Name
+                                        : x.ReliefItemId,
+                                    Unit = x.ReliefItem != null
+                                        ? x.ReliefItem.Unit
+                                        : string.Empty
+                                })
+                                .Select(group =>
+                                    $"{group.Key.Name} {group.Sum(x => x.Quantity)} {group.Key.Unit}".Trim()
+                                )
+                                .ToList();
+
+                            var visibleItems = string.Join(
+                                ", ",
+                                itemSummaries.Take(3)
+                            );
+
+                            if (itemSummaries.Count > 3)
+                            {
+                                visibleItems +=
+                                    $" และอีก {itemSummaries.Count - 3} รายการ";
+                            }
+
+                            var notificationMessage =
+                                $"{visibleItems} จากการบริจาค #{donorGroup.Key.DonationId} ถูกส่งถึงผู้ประสบภัยในเคสช่วยเหลือ #{request.Id} เรียบร้อยแล้ว";
+
+                            if (notificationMessage.Length > 500)
+                            {
+                                notificationMessage =
+                                    notificationMessage[..497] + "...";
+                            }
+
+                            _context.Notifications.Add(
+                                new FloodRelief.Models.Notification
+                                {
+                                    Id = nextCompletedNotificationId,
+                                    UserId = donorGroup.Key.UserId,
+                                    Type = "DonationDelivered",
+                                    Title = "สิ่งของของคุณถูกส่งต่อแล้ว",
+                                    Message = notificationMessage,
+                                    ReferenceType = "Donation",
+                                    ReferenceId = donorGroup.Key.DonationId,
+                                    IsRead = false,
+                                    CreatedAt = updatedAt
+                                }
+                            );
+
+                            nextCompletedNotificationId =
+                                PrimaryKeyHelper.IncrementId(
+                                    nextCompletedNotificationId,
+                                    "Notification"
+                                );
+                        }
+                    }
+
                     break;
 
                 case SosRequestStatuses.Cancelled:
@@ -1315,6 +1922,23 @@ namespace FloodRelief.Services
                 Latitude = x.Latitude,
                 Longitude = x.Longitude,
                 AddressDetail = x.AddressDetail,
+                RequestType = x.RequestType,
+                EmergencyType = x.EmergencyType,
+                VictimCount = x.VictimCount,
+                ChildCount = x.ChildCount,
+                ElderlyCount = x.ElderlyCount,
+                DisabledCount = x.DisabledCount,
+                PatientCount = x.PatientCount,
+                WaterLevel = x.WaterLevel,
+                EmergencyDetail = x.EmergencyDetail,
+                Items = x.Items.Select(i => new SosRequestItemDto
+                {
+                    Id = i.Id,
+                    ReliefItemId = i.ReliefItemId,
+                    ReliefItemName = i.ReliefItem != null ? i.ReliefItem.Name : "ไม่ระบุ",
+                    Quantity = i.Quantity,
+                    Unit = i.Unit
+                }).ToList(),
                 Priority = x.Priority,
                 Status = x.Status,
                 CreatedAt = x.CreatedAt,
@@ -1392,6 +2016,23 @@ namespace FloodRelief.Services
                     Latitude = x.Latitude,
                     Longitude = x.Longitude,
                     AddressDetail = x.AddressDetail,
+                    RequestType = x.RequestType,
+                    EmergencyType = x.EmergencyType,
+                    VictimCount = x.VictimCount,
+                    ChildCount = x.ChildCount,
+                    ElderlyCount = x.ElderlyCount,
+                    DisabledCount = x.DisabledCount,
+                    PatientCount = x.PatientCount,
+                    WaterLevel = x.WaterLevel,
+                    EmergencyDetail = x.EmergencyDetail,
+                    Items = x.Items.Select(i => new SosRequestItemDto
+                    {
+                        Id = i.Id,
+                        ReliefItemId = i.ReliefItemId,
+                        ReliefItemName = i.ReliefItem != null ? i.ReliefItem.Name : "ไม่ระบุ",
+                        Quantity = i.Quantity,
+                        Unit = i.Unit
+                    }).ToList(),
                     Priority = x.Priority,
                     Status = x.Status,
                     CreatedAt = x.CreatedAt,
@@ -1495,6 +2136,23 @@ namespace FloodRelief.Services
                         ? x.AssignedStaff.FullName
                         : null,
                     AddressDetail = x.AddressDetail,
+                    RequestType = x.RequestType,
+                    EmergencyType = x.EmergencyType,
+                    VictimCount = x.VictimCount,
+                    ChildCount = x.ChildCount,
+                    ElderlyCount = x.ElderlyCount,
+                    DisabledCount = x.DisabledCount,
+                    PatientCount = x.PatientCount,
+                    WaterLevel = x.WaterLevel,
+                    EmergencyDetail = x.EmergencyDetail,
+                    Items = x.Items.Select(i => new SosRequestItemDto
+                    {
+                        Id = i.Id,
+                        ReliefItemId = i.ReliefItemId,
+                        ReliefItemName = i.ReliefItem != null ? i.ReliefItem.Name : "ไม่ระบุ",
+                        Quantity = i.Quantity,
+                        Unit = i.Unit
+                    }).ToList(),
                     Priority = x.Priority,
                     Status = x.Status,
                     CreatedAt = x.CreatedAt,
@@ -1503,6 +2161,182 @@ namespace FloodRelief.Services
                 .ToListAsync();
 
             return Ok(requests);
+        }
+        public async Task<IActionResult> CheckStockBeforeAccept(
+    string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return BadRequest(new
+                {
+                    message = "ไม่พบรหัสคำขอความช่วยเหลือ"
+                });
+            }
+
+            // ==========================================
+            // 1. หา Center ของ Staff ที่ Login อยู่
+            // ==========================================
+
+            var centerId = _currentUser.CenterId;
+
+            if (string.IsNullOrWhiteSpace(centerId))
+            {
+                return BadRequest(new
+                {
+                    message = "ไม่พบศูนย์ของเจ้าหน้าที่"
+                });
+            }
+
+            // ==========================================
+            // 2. หา SOS พร้อมรายการสิ่งของที่ร้องขอ
+            // ==========================================
+
+            var sosRequest = await _context.SosRequests
+                .AsNoTracking()
+                .Include(x => x.Items)
+                    .ThenInclude(x => x.ReliefItem)
+                .FirstOrDefaultAsync(x => x.Id == id);
+
+            if (sosRequest == null)
+            {
+                return NotFound(new
+                {
+                    message = "ไม่พบคำขอความช่วยเหลือ"
+                });
+            }
+
+            // ==========================================
+            // 3. ต้องยังเป็นเคสที่รับได้
+            // ==========================================
+
+            if (!string.Equals(
+                sosRequest.Status,
+                "Pending",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return Conflict(new
+                {
+                    message = "คำขอนี้ถูกรับงานหรือดำเนินการแล้ว"
+                });
+            }
+
+            if (string.Equals(
+                sosRequest.RequestType,
+                "Emergency",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return Ok(new SosStockCheckResponseDto
+                {
+                    SosRequestId = sosRequest.Id,
+                    CenterId = centerId,
+                    IsAllEnough = true,
+                    Items = new List<SosStockCheckItemDto>()
+                });
+            }
+
+            // ==========================================
+            // 4. เอา ReliefItemId ที่ SOS ต้องการ
+            // ==========================================
+
+            var reliefItemIds = sosRequest.Items
+                .Select(x => x.ReliefItemId)
+                .Distinct()
+                .ToList();
+
+            // ==========================================
+            // 5. ดึง Inventory ของศูนย์ Staff
+            // ==========================================
+
+            var inventories = await _context.CenterInventories
+                .AsNoTracking()
+                .Where(x =>
+                    x.CenterId == centerId &&
+                    reliefItemIds.Contains(x.ReliefItemId))
+                .ToListAsync();
+
+            // ==========================================
+            // 6. เปรียบเทียบ SOS กับ Inventory
+            // ==========================================
+
+            var items = sosRequest.Items
+                .Select(item =>
+                {
+                    var inventory = inventories
+                        .FirstOrDefault(x =>
+                            x.ReliefItemId ==
+                            item.ReliefItemId);
+
+                    var requestedQuantity =
+                        item.Quantity;
+
+                    var availableQuantity =
+                        inventory?.Quantity ?? 0;
+
+                    var isEnough =
+                        availableQuantity >=
+                        requestedQuantity;
+
+                    return new SosStockCheckItemDto
+                    {
+                        ReliefItemId =
+                            item.ReliefItemId,
+
+                        ReliefItemName =
+                            item.ReliefItem?.Name
+                            ?? "ไม่ระบุ",
+
+                        Unit =
+                            item.Unit ?? "",
+
+                        RequestedQuantity =
+                            requestedQuantity,
+
+                        AvailableQuantity =
+                            availableQuantity,
+
+                        RemainingQuantity =
+                            Math.Max(
+                                availableQuantity -
+                                requestedQuantity,
+                                0),
+
+                        ShortageQuantity =
+                            Math.Max(
+                                requestedQuantity -
+                                availableQuantity,
+                                0),
+
+                        IsEnough =
+                            isEnough
+                    };
+                })
+                .ToList();
+
+            // ==========================================
+            // 7. ต้องพอทุกรายการ
+            // ==========================================
+
+            var isAllEnough =
+                items.Count > 0 &&
+                items.All(x => x.IsEnough);
+
+            var response =
+                new SosStockCheckResponseDto
+                {
+                    SosRequestId =
+                        sosRequest.Id,
+
+                    CenterId =
+                        centerId,
+
+                    IsAllEnough =
+                        isAllEnough,
+
+                    Items =
+                        items
+                };
+
+            return Ok(response);
         }
         private static int GetPriorityOrder(string? priority)
         {

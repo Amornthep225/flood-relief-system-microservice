@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace FloodRelief.Models
@@ -32,7 +32,10 @@ namespace FloodRelief.Models
             = new List<SosRequest>();
 
         public ICollection<Donation> Donations { get; set; }
-    = new List<Donation>();
+            = new List<Donation>();
+
+        public ICollection<Notification> Notifications { get; set; }
+            = new List<Notification>();
 
     }
 }

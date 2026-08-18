@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FloodRelief.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260723041749_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260815101318_AddTable")]
+    partial class AddTable
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -236,6 +236,93 @@ namespace FloodRelief.Migrations
                     b.ToTable("donations");
                 });
 
+            modelBuilder.Entity("FloodRelief.Models.DonationAllocation", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<DateTime>("AllocatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("DonationBatchId")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ReliefItemId")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<string>("SosRequestId")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DonationBatchId");
+
+                    b.HasIndex("ReliefItemId");
+
+                    b.HasIndex("SosRequestId", "DonationBatchId");
+
+                    b.ToTable("donation_allocations");
+                });
+
+            modelBuilder.Entity("FloodRelief.Models.DonationBatch", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<string>("CenterId")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("varchar(5)");
+
+                    b.Property<string>("DonationId")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<string>("DonationItemId")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("ReceivedQuantity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ReliefItemId")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<int>("RemainingQuantity")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DonationId");
+
+                    b.HasIndex("DonationItemId")
+                        .IsUnique();
+
+                    b.HasIndex("ReliefItemId");
+
+                    b.HasIndex("CenterId", "ReliefItemId", "ReceivedAt");
+
+                    b.ToTable("donation_batches");
+                });
+
             modelBuilder.Entity("FloodRelief.Models.DonationItem", b =>
                 {
                     b.Property<string>("Id")
@@ -316,6 +403,56 @@ namespace FloodRelief.Migrations
                     b.HasIndex("StaffId");
 
                     b.ToTable("inventory_transactions");
+                });
+
+            modelBuilder.Entity("FloodRelief.Models.Notification", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ReferenceId")
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<string>("ReferenceType")
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "IsRead", "CreatedAt");
+
+                    b.ToTable("notifications");
                 });
 
             modelBuilder.Entity("FloodRelief.Models.ReliefCategory", b =>
@@ -404,6 +541,9 @@ namespace FloodRelief.Migrations
                         .HasMaxLength(5)
                         .HasColumnType("varchar(5)");
 
+                    b.Property<int>("ChildCount")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("datetime(6)");
 
@@ -413,16 +553,38 @@ namespace FloodRelief.Migrations
                     b.Property<DateTime?>("DeliveringAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<int>("DisabledCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ElderlyCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("EmergencyDetail")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<string>("EmergencyType")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
                     b.Property<double>("Latitude")
                         .HasColumnType("double");
 
                     b.Property<double>("Longitude")
                         .HasColumnType("double");
 
+                    b.Property<int>("PatientCount")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("PreparingAt")
                         .HasColumnType("datetime(6)");
 
                     b.Property<string>("Priority")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<string>("RequestType")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)");
@@ -447,6 +609,12 @@ namespace FloodRelief.Migrations
                     b.Property<string>("UserRemark")
                         .HasMaxLength(500)
                         .HasColumnType("varchar(500)");
+
+                    b.Property<int>("VictimCount")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("WaterLevel")
+                        .HasColumnType("decimal(5,2)");
 
                     b.HasKey("Id");
 
@@ -816,6 +984,68 @@ namespace FloodRelief.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("FloodRelief.Models.DonationAllocation", b =>
+                {
+                    b.HasOne("FloodRelief.Models.DonationBatch", "DonationBatch")
+                        .WithMany("Allocations")
+                        .HasForeignKey("DonationBatchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FloodRelief.Models.ReliefItem", "ReliefItem")
+                        .WithMany()
+                        .HasForeignKey("ReliefItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FloodRelief.Models.SosRequest", "SosRequest")
+                        .WithMany("DonationAllocations")
+                        .HasForeignKey("SosRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("DonationBatch");
+
+                    b.Navigation("ReliefItem");
+
+                    b.Navigation("SosRequest");
+                });
+
+            modelBuilder.Entity("FloodRelief.Models.DonationBatch", b =>
+                {
+                    b.HasOne("FloodRelief.Models.Center", "Center")
+                        .WithMany()
+                        .HasForeignKey("CenterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FloodRelief.Models.Donation", "Donation")
+                        .WithMany("Batches")
+                        .HasForeignKey("DonationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FloodRelief.Models.DonationItem", "DonationItem")
+                        .WithMany("Batches")
+                        .HasForeignKey("DonationItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FloodRelief.Models.ReliefItem", "ReliefItem")
+                        .WithMany()
+                        .HasForeignKey("ReliefItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Center");
+
+                    b.Navigation("Donation");
+
+                    b.Navigation("DonationItem");
+
+                    b.Navigation("ReliefItem");
+                });
+
             modelBuilder.Entity("FloodRelief.Models.DonationItem", b =>
                 {
                     b.HasOne("FloodRelief.Models.Donation", "Donation")
@@ -851,6 +1081,17 @@ namespace FloodRelief.Migrations
                     b.Navigation("CenterInventory");
 
                     b.Navigation("Staff");
+                });
+
+            modelBuilder.Entity("FloodRelief.Models.Notification", b =>
+                {
+                    b.HasOne("FloodRelief.Models.User", "User")
+                        .WithMany("Notifications")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("FloodRelief.Models.ReliefItem", b =>
@@ -968,7 +1209,19 @@ namespace FloodRelief.Migrations
 
             modelBuilder.Entity("FloodRelief.Models.Donation", b =>
                 {
+                    b.Navigation("Batches");
+
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("FloodRelief.Models.DonationBatch", b =>
+                {
+                    b.Navigation("Allocations");
+                });
+
+            modelBuilder.Entity("FloodRelief.Models.DonationItem", b =>
+                {
+                    b.Navigation("Batches");
                 });
 
             modelBuilder.Entity("FloodRelief.Models.ReliefCategory", b =>
@@ -983,6 +1236,8 @@ namespace FloodRelief.Migrations
 
             modelBuilder.Entity("FloodRelief.Models.SosRequest", b =>
                 {
+                    b.Navigation("DonationAllocations");
+
                     b.Navigation("Items");
                 });
 
@@ -1020,6 +1275,8 @@ namespace FloodRelief.Migrations
             modelBuilder.Entity("FloodRelief.Models.User", b =>
                 {
                     b.Navigation("Donations");
+
+                    b.Navigation("Notifications");
 
                     b.Navigation("SosRequests");
                 });
