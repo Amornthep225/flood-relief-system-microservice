@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace FloodRelief.Models
@@ -46,5 +46,8 @@ namespace FloodRelief.Models
 
         public ICollection<InventoryTransaction> InventoryTransactions { get; set; }
             = new List<InventoryTransaction>();
+
+        public ICollection<Notification> Notifications { get; set; }
+            = new List<Notification>();
     }
 }

@@ -21,9 +21,9 @@ namespace FloodRelief.Services.Notification
 
         public async Task<IActionResult> GetMyNotifications(int take = 20)
         {
-            var userId = _currentUser.UserId;
+            var principalId = _currentUser.UserId;
 
-            if (string.IsNullOrWhiteSpace(userId))
+            if (string.IsNullOrWhiteSpace(principalId))
             {
                 return Unauthorized(new
                 {
@@ -35,7 +35,23 @@ namespace FloodRelief.Services.Notification
 
             var query = _context.Notifications
                 .AsNoTracking()
-                .Where(x => x.UserId == userId);
+                .AsQueryable();
+
+            if (_currentUser.IsInRole("Staff"))
+            {
+                query = query.Where(x => x.StaffId == principalId);
+            }
+            else if (_currentUser.IsInRole("User"))
+            {
+                query = query.Where(x => x.UserId == principalId);
+            }
+            else
+            {
+                return Unauthorized(new
+                {
+                    message = "บัญชีนี้ไม่รองรับระบบการแจ้งเตือน"
+                });
+            }
 
             var unreadCount = await query.CountAsync(x => !x.IsRead);
 
@@ -65,9 +81,9 @@ namespace FloodRelief.Services.Notification
 
         public async Task<IActionResult> MarkAsRead(string id)
         {
-            var userId = _currentUser.UserId;
+            var principalId = _currentUser.UserId;
 
-            if (string.IsNullOrWhiteSpace(userId))
+            if (string.IsNullOrWhiteSpace(principalId))
             {
                 return Unauthorized(new
                 {
@@ -75,11 +91,26 @@ namespace FloodRelief.Services.Notification
                 });
             }
 
-            var notification = await _context.Notifications
-                .FirstOrDefaultAsync(x =>
-                    x.Id == id &&
-                    x.UserId == userId
-                );
+            var query = _context.Notifications
+                .Where(x => x.Id == id);
+
+            if (_currentUser.IsInRole("Staff"))
+            {
+                query = query.Where(x => x.StaffId == principalId);
+            }
+            else if (_currentUser.IsInRole("User"))
+            {
+                query = query.Where(x => x.UserId == principalId);
+            }
+            else
+            {
+                return Unauthorized(new
+                {
+                    message = "บัญชีนี้ไม่รองรับระบบการแจ้งเตือน"
+                });
+            }
+
+            var notification = await query.FirstOrDefaultAsync();
 
             if (notification == null)
             {
@@ -105,9 +136,9 @@ namespace FloodRelief.Services.Notification
 
         public async Task<IActionResult> MarkAllAsRead()
         {
-            var userId = _currentUser.UserId;
+            var principalId = _currentUser.UserId;
 
-            if (string.IsNullOrWhiteSpace(userId))
+            if (string.IsNullOrWhiteSpace(principalId))
             {
                 return Unauthorized(new
                 {
@@ -115,12 +146,26 @@ namespace FloodRelief.Services.Notification
                 });
             }
 
-            var unreadNotifications = await _context.Notifications
-                .Where(x =>
-                    x.UserId == userId &&
-                    !x.IsRead
-                )
-                .ToListAsync();
+            var query = _context.Notifications
+                .Where(x => !x.IsRead);
+
+            if (_currentUser.IsInRole("Staff"))
+            {
+                query = query.Where(x => x.StaffId == principalId);
+            }
+            else if (_currentUser.IsInRole("User"))
+            {
+                query = query.Where(x => x.UserId == principalId);
+            }
+            else
+            {
+                return Unauthorized(new
+                {
+                    message = "บัญชีนี้ไม่รองรับระบบการแจ้งเตือน"
+                });
+            }
+
+            var unreadNotifications = await query.ToListAsync();
 
             if (unreadNotifications.Count == 0)
             {

@@ -10,9 +10,11 @@ namespace FloodRelief.Models
         [StringLength(10)]
         public string Id { get; set; } = string.Empty;
 
-        [Required]
         [StringLength(10)]
-        public string UserId { get; set; } = string.Empty;
+        public string? UserId { get; set; }
+
+        [StringLength(5)]
+        public string? StaffId { get; set; }
 
         [Required]
         [StringLength(40)]
@@ -39,6 +41,9 @@ namespace FloodRelief.Models
         public DateTime? ReadAt { get; set; }
 
         [ForeignKey(nameof(UserId))]
-        public User User { get; set; } = null!;
+        public User? User { get; set; }
+
+        [ForeignKey(nameof(StaffId))]
+        public Staff? Staff { get; set; }
     }
 }

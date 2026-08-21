@@ -1,4 +1,4 @@
-﻿using FloodRelief.Services.Common;
+using FloodRelief.Services.Common;
 using FloodRelief.Helpers;
 using System.Data;
 using System.Security.Claims;
@@ -247,6 +247,15 @@ namespace FloodRelief.Services
 
                 _context.SosRequests.Add(request);
                 await _context.SaveChangesAsync();
+
+                await AddNewRequestNotificationsToAllStaffAsync(
+                    request,
+                    type: "StaffNewRelief",
+                    title: "มีคำขอรับสิ่งของใหม่",
+                    message: $"คำขอรับสิ่งของ #{request.Id} รอเจ้าหน้าที่รับงาน ที่อยู่: {request.AddressDetail}"
+                );
+
+                await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
                 return CreatedAtAction(
@@ -384,6 +393,15 @@ namespace FloodRelief.Services
                 );
 
                 await _context.SaveChangesAsync();
+
+                await AddNewRequestNotificationsToAllStaffAsync(
+                    request,
+                    type: "StaffNewSos",
+                    title: "มี SOS ฉุกเฉินใหม่",
+                    message: $"SOS #{request.Id} ต้องการความช่วยเหลือด่วน ที่อยู่: {request.AddressDetail}"
+                );
+
+                await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
                 return CreatedAtAction(
@@ -452,9 +470,9 @@ namespace FloodRelief.Services
                     message = "ไม่พบข้อมูลผู้ใช้จาก Token"
                 });
             }
-            var query = _context.SosRequests
-                  .AsNoTracking()
-                  .Where(x => x.UserId == userId);
+          var query = _context.SosRequests
+                .AsNoTracking()
+                .Where(x => x.UserId == userId);
             // วันที่เริ่มต้น
             if (startDate.HasValue)
             {
@@ -972,6 +990,35 @@ namespace FloodRelief.Services
                     CreatedAt = now
                 }
             );
+
+            if (
+                _currentUser.IsInRole("Admin") &&
+                !string.IsNullOrWhiteSpace(request.AssignedStaffId)
+            )
+            {
+                nextNotificationId =
+                    PrimaryKeyHelper.IncrementId(
+                        nextNotificationId,
+                        "Notification"
+                    );
+
+                _context.Notifications.Add(
+                    new FloodRelief.Models.Notification
+                    {
+                        Id = nextNotificationId,
+                        StaffId = request.AssignedStaffId,
+                        Type = "StaffCaseAssigned",
+                        Title = "คุณได้รับมอบหมายเคสใหม่",
+                        Message = isEmergencyRequest
+                            ? $"Admin มอบหมาย SOS #{request.Id} ให้คุณรับผิดชอบ กรุณาตรวจสอบและดำเนินการช่วยเหลือ"
+                            : $"Admin มอบหมายคำขอรับสิ่งของ #{request.Id} ให้คุณรับผิดชอบ กรุณาตรวจสอบรายละเอียดเคส",
+                        ReferenceType = "SosRequest",
+                        ReferenceId = request.Id,
+                        IsRead = false,
+                        CreatedAt = now
+                    }
+                );
+            }
 
             await _context.SaveChangesAsync();
 
@@ -1704,6 +1751,39 @@ namespace FloodRelief.Services
                 case SosRequestStatuses.Cancelled:
                 case SosRequestStatuses.Rejected:
                     request.CancelledAt = updatedAt;
+
+                    if (
+                        !string.IsNullOrWhiteSpace(request.AssignedStaffId) &&
+                        !(
+                            _currentUser.IsInRole("Staff") &&
+                            request.AssignedStaffId == _currentUser.UserId
+                        )
+                    )
+                    {
+                        var cancelledNotificationId =
+                            await PrimaryKeyHelper.GenerateNextIdAsync(
+                                _context.Notifications,
+                                x => x.Id,
+                                "Notification"
+                            );
+
+                        _context.Notifications.Add(
+                            new FloodRelief.Models.Notification
+                            {
+                                Id = cancelledNotificationId,
+                                StaffId = request.AssignedStaffId,
+                                Type = "StaffCaseCancelled",
+                                Title = "เคสที่คุณรับผิดชอบถูกยกเลิก",
+                                Message =
+                                    $"เคส #{request.Id} ถูกยกเลิกหรือปฏิเสธ กรุณาหยุดการดำเนินงานสำหรับเคสนี้",
+                                ReferenceType = "SosRequest",
+                                ReferenceId = request.Id,
+                                IsRead = false,
+                                CreatedAt = updatedAt
+                            }
+                        );
+                    }
+
                     break;
             }
 
@@ -1753,6 +1833,13 @@ namespace FloodRelief.Services
             request.CancelledAt = DateTime.Now;
             request.UpdatedAt = DateTime.Now;
 
+            await AddNewRequestNotificationsToAllStaffAsync(
+                request,
+                type: "StaffCaseCancelled",
+                title: "คำขอที่รอรับงานถูกยกเลิก",
+                message: $"เคส #{request.Id} ถูกผู้ใช้งานยกเลิกแล้ว ไม่ต้องรับหรือดำเนินการเคสนี้"
+            );
+
             await _context.SaveChangesAsync();
 
             return Ok(new
@@ -1761,6 +1848,59 @@ namespace FloodRelief.Services
             });
         }
 
+
+        private async Task AddNewRequestNotificationsToAllStaffAsync(
+            SosRequest request,
+            string type,
+            string title,
+            string message)
+        {
+            var staffIds = await _context.Staffs
+                .AsNoTracking()
+                .Where(x => x.IsActive)
+                .Select(x => x.Id)
+                .ToListAsync();
+
+            if (staffIds.Count == 0)
+            {
+                return;
+            }
+
+            var nextNotificationId =
+                await PrimaryKeyHelper.GenerateNextIdAsync(
+                    _context.Notifications,
+                    x => x.Id,
+                    "Notification"
+                );
+
+            var normalizedMessage = message.Length > 500
+                ? message[..497] + "..."
+                : message;
+
+            foreach (var staffId in staffIds)
+            {
+                _context.Notifications.Add(
+                    new FloodRelief.Models.Notification
+                    {
+                        Id = nextNotificationId,
+                        StaffId = staffId,
+                        Type = type,
+                        Title = title,
+                        Message = normalizedMessage,
+                        ReferenceType = "SosRequest",
+                        ReferenceId = request.Id,
+                        IsRead = false,
+                        CreatedAt = DateTime.Now
+                    }
+                );
+
+                nextNotificationId =
+                    PrimaryKeyHelper.IncrementId(
+                        nextNotificationId,
+                        "Notification"
+                    );
+            }
+        }
 
         private static bool IsValidPriority(string priority)
         {

@@ -430,6 +430,10 @@ namespace FloodRelief.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("varchar(30)");
 
+                    b.Property<string>("StaffId")
+                        .HasMaxLength(5)
+                        .HasColumnType("varchar(5)");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -441,11 +445,12 @@ namespace FloodRelief.Migrations
                         .HasColumnType("varchar(40)");
 
                     b.Property<string>("UserId")
-                        .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("varchar(10)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("StaffId", "IsRead", "CreatedAt");
 
                     b.HasIndex("UserId", "IsRead", "CreatedAt");
 
@@ -1082,11 +1087,17 @@ namespace FloodRelief.Migrations
 
             modelBuilder.Entity("FloodRelief.Models.Notification", b =>
                 {
+                    b.HasOne("FloodRelief.Models.Staff", "Staff")
+                        .WithMany("Notifications")
+                        .HasForeignKey("StaffId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("FloodRelief.Models.User", "User")
                         .WithMany("Notifications")
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Staff");
 
                     b.Navigation("User");
                 });
@@ -1243,6 +1254,8 @@ namespace FloodRelief.Migrations
                     b.Navigation("AssignedSosRequests");
 
                     b.Navigation("InventoryTransactions");
+
+                    b.Navigation("Notifications");
                 });
 
             modelBuilder.Entity("FloodRelief.Models.ThaiDistrict", b =>

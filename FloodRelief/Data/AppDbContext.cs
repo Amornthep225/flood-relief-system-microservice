@@ -183,9 +183,23 @@ namespace FloodRelief.Data
                 });
 
             modelBuilder.Entity<Notification>()
+                .HasIndex(x => new
+                {
+                    x.StaffId,
+                    x.IsRead,
+                    x.CreatedAt
+                });
+
+            modelBuilder.Entity<Notification>()
                 .HasOne(x => x.User)
                 .WithMany(x => x.Notifications)
                 .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Notification>()
+                .HasOne(x => x.Staff)
+                .WithMany(x => x.Notifications)
+                .HasForeignKey(x => x.StaffId)
                 .OnDelete(DeleteBehavior.Cascade);
         }
 

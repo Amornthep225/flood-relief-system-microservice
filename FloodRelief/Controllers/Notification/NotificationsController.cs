@@ -6,7 +6,7 @@ namespace FloodRelief.Controllers.Notification
 {
     [Route("api/notifications")]
     [ApiController]
-    [Authorize(Roles = "User")]
+    [Authorize(Roles = "User,Staff")]
     public class NotificationsController : ControllerBase
     {
         private readonly NotificationsService _service;
