@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using FloodRelief.Data;
+using FloodRelief.Hubs;
 using FloodRelief.Services.Auth;
 using FloodRelief.Services.Center;
 using FloodRelief.Services.Common;
@@ -18,6 +19,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddSignalR();
 
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<CurrentUserService>();
@@ -34,6 +36,7 @@ builder.Services.AddScoped<ThaiAddressesService>();
 builder.Services.AddScoped<UploadService>();
 builder.Services.AddScoped<WeatherForecastService>();
 builder.Services.AddScoped<NotificationsService>();
+builder.Services.AddScoped<NotificationRealtimeService>();
 
 var connectionString =
     builder.Configuration.GetConnectionString("DefaultConnection")
@@ -54,7 +57,10 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowFrontend", policy =>
     {
         policy
-            .WithOrigins("http://localhost:3000")
+            .WithOrigins(
+                "http://localhost:3000",
+                "http://127.0.0.1:3000"
+            )
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
@@ -97,6 +103,27 @@ builder.Services
 
                 ClockSkew = TimeSpan.Zero
             };
+
+        // SignalR browser clients send the JWT as access_token during
+        // WebSocket/SSE transport. Only accept it for our notification hub.
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+
+                if (
+                    !string.IsNullOrWhiteSpace(accessToken) &&
+                    path.StartsWithSegments("/hubs/notifications")
+                )
+                {
+                    context.Token = accessToken;
+                }
+
+                return Task.CompletedTask;
+            }
+        };
     });
 
 builder.Services.AddAuthorization();
@@ -197,5 +224,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<NotificationHub>("/hubs/notifications");
 
 app.Run();

@@ -1,4 +1,5 @@
 using FloodRelief.Services.Common;
+using FloodRelief.Services.Notification;
 using FloodRelief.Helpers;
 using FloodRelief.Data;
 using FloodRelief.DTOs.Donation;
@@ -14,13 +15,16 @@ namespace FloodRelief.Services.Donations
     {
         private readonly AppDbContext _context;
         private readonly CurrentUserService _currentUser;
+        private readonly NotificationRealtimeService _notificationRealtime;
 
         public DonationsService(
             AppDbContext context,
-            CurrentUserService currentUser)
+            CurrentUserService currentUser,
+            NotificationRealtimeService notificationRealtime)
         {
             _context = context;
             _currentUser = currentUser;
+            _notificationRealtime = notificationRealtime;
         }
 
 
@@ -603,6 +607,7 @@ namespace FloodRelief.Services.Donations
 
             var donation = await _context.Donations
                 .Include(x => x.Items)
+                    .ThenInclude(x => x.ReliefItem)
                 .FirstOrDefaultAsync(x => x.Id == id);
 
             if (donation == null)
@@ -710,10 +715,9 @@ namespace FloodRelief.Services.Donations
                         "DonationBatch");
 
                 var nextNotificationId =
-                    await PrimaryKeyHelper.GenerateNextIdAsync(
-                        _context.Notifications,
-                        x => x.Id,
-                        "Notification");
+                    await NotificationIdHelper.GenerateNextIdAsync(
+                        _context
+                    );
 
                 var receivedAt = DateTime.Now;
                 var receivedItems = new List<object>();
@@ -865,15 +869,19 @@ namespace FloodRelief.Services.Donations
                 donation.Status = "Received";
                 donation.UpdatedAt = receivedAt;
 
+                var donationItemSummary =
+                    BuildDonationItemSummary(donation.Items);
+
+                // Notify the donor with the actual item summary.
                 _context.Notifications.Add(
                     new FloodRelief.Models.Notification
                     {
                         Id = nextNotificationId,
                         UserId = donation.UserId,
                         Type = "DonationReceived",
-                        Title = "ศูนย์ได้รับของบริจาคแล้ว",
+                        Title = "รายการบริจาคของคุณถูกรับเข้าศูนย์แล้ว",
                         Message =
-                            $"ของบริจาค #{donation.Id} ถูกรับเข้าศูนย์เรียบร้อยแล้ว ขอบคุณที่ร่วมส่งต่อความช่วยเหลือ",
+                            $"บริจาค #{donation.Id}: {donationItemSummary}",
                         ReferenceType = "Donation",
                         ReferenceId = donation.Id,
                         IsRead = false,
@@ -881,9 +889,44 @@ namespace FloodRelief.Services.Donations
                     }
                 );
 
-                await _context.SaveChangesAsync();
+                // Notify every active staff member in the same center.
+                var centerStaffIds = await _context.Staffs
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.CenterId == donation.CenterId &&
+                        x.IsActive
+                    )
+                    .Select(x => x.Id)
+                    .ToListAsync();
+
+                foreach (var centerStaffId in centerStaffIds)
+                {
+                    var staffNotificationId =
+                        await NotificationIdHelper.GenerateNextIdAsync(
+                            _context
+                        );
+
+                    _context.Notifications.Add(
+                        new FloodRelief.Models.Notification
+                        {
+                            Id = staffNotificationId,
+                            StaffId = centerStaffId,
+                            Type = "StaffDonationReceived",
+                            Title = "มีของบริจาคเข้าศูนย์วันนี้",
+                            Message =
+                                $"บริจาค #{donation.Id}: {donationItemSummary}",
+                            ReferenceType = "Donation",
+                            ReferenceId = donation.Id,
+                            IsRead = false,
+                            CreatedAt = receivedAt
+                        }
+                    );
+                }
+
+                await _notificationRealtime.SaveChangesAsync();
 
                 await databaseTransaction.CommitAsync();
+                await _notificationRealtime.FlushAsync();
 
                 return Ok(new
                 {
@@ -909,6 +952,7 @@ namespace FloodRelief.Services.Donations
             catch (DbUpdateException)
             {
                 await databaseTransaction.RollbackAsync();
+                _notificationRealtime.DiscardPending();
 
                 return StatusCode(500, new
                 {
@@ -919,6 +963,7 @@ namespace FloodRelief.Services.Donations
             catch (Exception)
             {
                 await databaseTransaction.RollbackAsync();
+                _notificationRealtime.DiscardPending();
 
                 return StatusCode(500, new
                 {
@@ -926,6 +971,49 @@ namespace FloodRelief.Services.Donations
                         "เกิดข้อผิดพลาดขณะรับของบริจาค"
                 });
             }
+        }
+
+
+
+        private static string BuildDonationItemSummary(
+            IEnumerable<DonationItem> items)
+        {
+            // notifications.message is limited to 500 characters.
+            const int MaximumSummaryLength = 380;
+
+            var parts = items
+                .Select(item =>
+                {
+                    var itemName =
+                        item.ReliefItem?.Name?.Trim();
+
+                    if (string.IsNullOrWhiteSpace(itemName))
+                    {
+                        itemName = $"รหัส {item.ReliefItemId}";
+                    }
+
+                    var unit = item.Unit?.Trim();
+
+                    return string.IsNullOrWhiteSpace(unit)
+                        ? $"{itemName} {item.Quantity}"
+                        : $"{itemName} {item.Quantity} {unit}";
+                })
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+
+            if (parts.Count == 0)
+            {
+                return "ไม่พบรายการสิ่งของ";
+            }
+
+            var summary = string.Join(", ", parts);
+
+            if (summary.Length <= MaximumSummaryLength)
+            {
+                return summary;
+            }
+
+            return summary[..(MaximumSummaryLength - 3)] + "...";
         }
 
         public async Task<IActionResult> DeleteDonation(

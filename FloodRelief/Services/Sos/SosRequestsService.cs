@@ -1,4 +1,5 @@
 using FloodRelief.Services.Common;
+using FloodRelief.Services.Notification;
 using FloodRelief.Helpers;
 using System.Data;
 using System.Security.Claims;
@@ -16,13 +17,16 @@ namespace FloodRelief.Services
     {
         private readonly AppDbContext _context;
         private readonly CurrentUserService _currentUser;
+        private readonly NotificationRealtimeService _notificationRealtime;
 
         public SosRequestsService(
             AppDbContext context,
-            CurrentUserService currentUser)
+            CurrentUserService currentUser,
+            NotificationRealtimeService notificationRealtime)
         {
             _context = context;
             _currentUser = currentUser;
+            _notificationRealtime = notificationRealtime;
         }
         public async Task<IActionResult> GetMyRequests()
         {
@@ -246,7 +250,7 @@ namespace FloodRelief.Services
                 }
 
                 _context.SosRequests.Add(request);
-                await _context.SaveChangesAsync();
+                await _notificationRealtime.SaveChangesAsync();
 
                 await AddNewRequestNotificationsToAllStaffAsync(
                     request,
@@ -255,8 +259,9 @@ namespace FloodRelief.Services
                     message: $"คำขอรับสิ่งของ #{request.Id} รอเจ้าหน้าที่รับงาน ที่อยู่: {request.AddressDetail}"
                 );
 
-                await _context.SaveChangesAsync();
+                await _notificationRealtime.SaveChangesAsync();
                 await transaction.CommitAsync();
+                await _notificationRealtime.FlushAsync();
 
                 return CreatedAtAction(
                     nameof(GetSosRequestById),
@@ -273,6 +278,7 @@ namespace FloodRelief.Services
             catch
             {
                 await transaction.RollbackAsync();
+                _notificationRealtime.DiscardPending();
                 throw;
             }
         }
@@ -392,7 +398,7 @@ namespace FloodRelief.Services
                     }
                 );
 
-                await _context.SaveChangesAsync();
+                await _notificationRealtime.SaveChangesAsync();
 
                 await AddNewRequestNotificationsToAllStaffAsync(
                     request,
@@ -401,8 +407,9 @@ namespace FloodRelief.Services
                     message: $"SOS #{request.Id} ต้องการความช่วยเหลือด่วน ที่อยู่: {request.AddressDetail}"
                 );
 
-                await _context.SaveChangesAsync();
+                await _notificationRealtime.SaveChangesAsync();
                 await transaction.CommitAsync();
+                await _notificationRealtime.FlushAsync();
 
                 return CreatedAtAction(
                     nameof(GetSosRequestById),
@@ -422,6 +429,7 @@ namespace FloodRelief.Services
             catch
             {
                 await transaction.RollbackAsync();
+                _notificationRealtime.DiscardPending();
                 throw;
             }
         }
@@ -1020,7 +1028,7 @@ namespace FloodRelief.Services
                 );
             }
 
-            await _context.SaveChangesAsync();
+            await _notificationRealtime.SaveChangesAsync();
 
             return Ok(new
             {
@@ -1199,7 +1207,7 @@ namespace FloodRelief.Services
                         }
                     );
 
-                    await _context.SaveChangesAsync();
+                    await _notificationRealtime.SaveChangesAsync();
 
                     return Ok(new
                     {
@@ -1292,6 +1300,7 @@ namespace FloodRelief.Services
                     if (insufficientItems.Count > 0)
                     {
                         await transaction.RollbackAsync();
+                        _notificationRealtime.DiscardPending();
 
                         return BadRequest(new
                         {
@@ -1442,7 +1451,7 @@ namespace FloodRelief.Services
                     request.UpdatedAt = now;
 
                     // บันทึก Inventory + Allocation ก่อน เพื่อให้ query trace ได้ใน transaction เดียวกัน
-                    await _context.SaveChangesAsync();
+                    await _notificationRealtime.SaveChangesAsync();
 
                     var nextNotificationId =
                         await PrimaryKeyHelper.GenerateNextIdAsync(
@@ -1555,8 +1564,9 @@ namespace FloodRelief.Services
                             );
                     }
 
-                    await _context.SaveChangesAsync();
+                    await _notificationRealtime.SaveChangesAsync();
                     await transaction.CommitAsync();
+                    await _notificationRealtime.FlushAsync();
 
                     return Ok(new
                     {
@@ -1575,6 +1585,7 @@ namespace FloodRelief.Services
                 catch
                 {
                     await transaction.RollbackAsync();
+                    _notificationRealtime.DiscardPending();
                     throw;
                 }
             }
@@ -1787,7 +1798,7 @@ namespace FloodRelief.Services
                     break;
             }
 
-            await _context.SaveChangesAsync();
+            await _notificationRealtime.SaveChangesAsync();
 
             return Ok(new
             {
@@ -1840,7 +1851,7 @@ namespace FloodRelief.Services
                 message: $"เคส #{request.Id} ถูกผู้ใช้งานยกเลิกแล้ว ไม่ต้องรับหรือดำเนินการเคสนี้"
             );
 
-            await _context.SaveChangesAsync();
+            await _notificationRealtime.SaveChangesAsync();
 
             return Ok(new
             {
