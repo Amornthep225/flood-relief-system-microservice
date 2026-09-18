@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace FloodRelief.Models
@@ -20,6 +20,10 @@ namespace FloodRelief.Models
 
         [Range(1, int.MaxValue)]
         public int Quantity { get; set; }
+
+        // จำนวนที่ Staff/Admin อนุมัติจริง สำหรับคำขอรับสิ่งของแบบบางส่วน
+        // null = ยังไม่ได้อนุมัติ (เช่นคำขอที่ยัง Pending)
+        public int? ApprovedQuantity { get; set; }
 
         [Required]
         [StringLength(50)]

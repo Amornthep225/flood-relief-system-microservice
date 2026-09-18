@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace FloodRelief.DTOs.Sos
 {
@@ -19,18 +19,24 @@ namespace FloodRelief.DTOs.Sos
         )]
         public double Longitude { get; set; }
 
-        [Required(ErrorMessage = "กรุณาระบุรายละเอียดที่อยู่")]
         [StringLength(
             500,
             ErrorMessage = "รายละเอียดที่อยู่ต้องไม่เกิน 500 ตัวอักษร"
         )]
-        public string AddressDetail { get; set; } = string.Empty;
+        public string? AddressDetail { get; set; }
 
         [StringLength(
             500,
             ErrorMessage = "หมายเหตุต้องไม่เกิน 500 ตัวอักษร"
         )]
         public string? UserRemark { get; set; }
+
+        [Required(ErrorMessage = "กรุณาเลือกวิธีรับสิ่งของ")]
+        [RegularExpression(
+            "^(Delivery|Pickup)$",
+            ErrorMessage = "วิธีรับสิ่งของไม่ถูกต้อง"
+        )]
+        public string ReceiveMethod { get; set; } = "Delivery";
 
         [Required(ErrorMessage = "กรุณาเลือกรายการสิ่งของ")]
         [MinLength(

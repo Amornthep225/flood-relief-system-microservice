@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using FloodRelief.Constants;
 
 namespace FloodRelief.DTOs.Sos
 {
@@ -32,6 +33,13 @@ namespace FloodRelief.DTOs.Sos
 
         [Range(0, 1000)]
         public int PatientCount { get; set; }
+
+        [Range(0, 1000, ErrorMessage = "จำนวนผู้เสียชีวิตต้องเป็น 0 ขึ้นไป")]
+        public int DeathCount { get; set; }
+
+        [Required(ErrorMessage = "กรุณาระบุระดับความรุนแรงของผู้ประสบภัย")]
+        [StringLength(20)]
+        public string Severity { get; set; } = SosSeverities.Moderate;
 
         [Range(0, 20, ErrorMessage = "ระดับน้ำต้องอยู่ระหว่าง 0-20 เมตร")]
         public decimal? WaterLevel { get; set; }

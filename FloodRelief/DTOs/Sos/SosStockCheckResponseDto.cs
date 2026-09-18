@@ -1,4 +1,4 @@
-﻿namespace FloodRelief.DTOs.Sos
+namespace FloodRelief.DTOs.Sos
 {
     public class SosStockCheckResponseDto
     {
@@ -10,10 +10,13 @@
 
         public List<SosStockCheckItemDto> Items { get; set; }
             = new();
+
+        public List<SosPendingRequestDto> PendingRequests { get; set; } = new();
     }
 
     public class SosStockCheckItemDto
     {
+        public string SosRequestItemId { get; set; } = string.Empty;
         public string ReliefItemId { get; set; } = string.Empty;
 
         public string ReliefItemName { get; set; } = string.Empty;
@@ -29,9 +32,20 @@
         // ถ้าจ่ายแล้วจะเหลือเท่าไร
         public int RemainingQuantity { get; set; }
 
-        // ขาดอีกเท่าไร
+        // ขาดอีกเท่าไรจากจำนวนที่ร้องขอ
         public int ShortageQuantity { get; set; }
 
         public bool IsEnough { get; set; }
+
+        public List<SosPendingRequestDto> PendingRequests { get; set; } = new();
+    }
+
+    public class SosPendingRequestDto
+    {
+        public string SosRequestId { get; set; } = string.Empty;
+        public string ReliefItemId { get; set; } = string.Empty;
+        public string ReliefItemName { get; set; } = string.Empty;
+        public string Unit { get; set; } = string.Empty;
+        public int RequestedQuantity { get; set; }
     }
 }

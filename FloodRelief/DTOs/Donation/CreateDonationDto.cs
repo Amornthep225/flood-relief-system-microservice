@@ -4,8 +4,7 @@ namespace FloodRelief.DTOs.Donation
 {
     public class CreateDonationDto
     {
-        [Required]
-        public string CenterId { get; set; } = string.Empty;
+        public string? CenterId { get; set; }
 
 
         [Required]

@@ -6,6 +6,7 @@ using FloodRelief.Services;
 
 namespace FloodRelief.Controllers
 {
+    [Route("api/thai-addresses")]
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]

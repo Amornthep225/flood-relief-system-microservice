@@ -21,8 +21,13 @@ namespace FloodRelief.Models
         [StringLength(50)]
         public string Unit { get; set; } = string.Empty;
 
+        // 0 = ไม่จำกัดจำนวนที่ผู้ใช้สามารถขอได้ต่อคำขอ
+        [Range(0, int.MaxValue)]
+        public int MaximumRequestQuantity { get; set; } = 0;
+
         public bool IsActive { get; set; } = true;
 
+        public bool IsDonationOpen { get; set; } = true;
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
         [ForeignKey("ReliefCategoryId")]

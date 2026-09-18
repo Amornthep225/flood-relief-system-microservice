@@ -24,6 +24,8 @@ namespace FloodRelief.Models
         [Range(0, int.MaxValue)]
         public int MinimumQuantity { get; set; }
 
+        [Range(0, int.MaxValue)]
+        public int MaximumQuantity { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
         public DateTime? UpdatedAt { get; set; }

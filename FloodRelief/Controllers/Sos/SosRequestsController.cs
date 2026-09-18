@@ -133,9 +133,10 @@ namespace FloodRelief.Controllers
         [HttpGet("{id}/stock-check")]
         [Authorize(Roles = "Admin,Staff")]
         public async Task<IActionResult> CheckStockBeforeAccept(
-        string id)
+        string id,
+        [FromQuery] string? centerId)
         {
-            return await _service.CheckStockBeforeAccept(id);
+            return await _service.CheckStockBeforeAccept(id, centerId);
         }
         // GET: api/sos-requests/emergency-types
         [HttpGet("emergency-types")]

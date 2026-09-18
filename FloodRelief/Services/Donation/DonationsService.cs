@@ -50,17 +50,56 @@ namespace FloodRelief.Services.Donations
                 });
             }
 
+            // =====================================================
+            // ระบบใช้ศูนย์เดียว
+            // หา Center ที่เปิดใช้งานโดยอัตโนมัติ
+            // =====================================================
+            var centerId =
+                await _context.Centers
+                    .AsNoTracking()
+                    .Where(x => x.IsActive)
+                    .OrderBy(x => x.Id)
+                    .Select(x => x.Id)
+                    .FirstOrDefaultAsync();
+
+            if (string.IsNullOrWhiteSpace(centerId))
+            {
+                return BadRequest(new
+                {
+                    message = "ไม่พบศูนย์ช่วยเหลือที่เปิดใช้งาน"
+                });
+            }
+
+            // =====================================================
+            // ตรวจสอบว่ามีสินค้าเดียวกันซ้ำใน Donation เดียวหรือไม่
+            // =====================================================
+            var duplicateItem = dto.Items
+                .GroupBy(x => x.ReliefItemId)
+                .FirstOrDefault(x => x.Count() > 1);
+
+            if (duplicateItem != null)
+            {
+                return BadRequest(new
+                {
+                    message = "ไม่สามารถเพิ่มรายการสิ่งของชนิดเดียวกันซ้ำได้"
+                });
+            }
+
             var donationId =
                 await PrimaryKeyHelper.GenerateNextIdAsync(
                     _context.Donations,
                     x => x.Id,
-                    "Donation");
+                    "Donation"
+                );
 
             var donation = new Donation
             {
                 Id = donationId,
                 UserId = userId,
-                CenterId = dto.CenterId,
+
+                // ไม่ใช้ dto.CenterId แล้ว
+                CenterId = centerId,
+
                 Status = "Pending",
                 CreatedAt = DateTime.Now
             };
@@ -69,7 +108,8 @@ namespace FloodRelief.Services.Donations
                 await PrimaryKeyHelper.GenerateNextIdAsync(
                     _context.DonationItems,
                     x => x.Id,
-                    "DonationItem");
+                    "DonationItem"
+                );
 
             foreach (var item in dto.Items)
             {
@@ -88,43 +128,137 @@ namespace FloodRelief.Services.Donations
                     });
                 }
 
+                // =====================================================
+                // ตรวจจำนวน
+                // =====================================================
                 if (item.Quantity <= 0)
                 {
                     return BadRequest(new
                     {
-                        message = "จำนวนสิ่งของต้องมากกว่า 0"
+                        message =
+                            $"จำนวน {reliefItem.Name} ต้องมากกว่า 0"
                     });
                 }
 
+                // =====================================================
+                // ตรวจว่า Admin เปิดรับบริจาคหรือไม่
+                // =====================================================
+                if (!reliefItem.IsDonationOpen)
+                {
+                    return BadRequest(new
+                    {
+                        message =
+                            $"รายการ {reliefItem.Name} ปิดรับบริจาคแล้ว"
+                    });
+                }
+
+                // =====================================================
+                // ตรวจ Inventory ของศูนย์เดียว
+                // =====================================================
+                var inventory =
+                    await _context.CenterInventories
+                        .FirstOrDefaultAsync(x =>
+                            x.CenterId == centerId &&
+                            x.ReliefItemId == item.ReliefItemId
+                        );
+
+                if (inventory != null &&
+                    inventory.MaximumQuantity > 0)
+                {
+                    // =================================================
+                    // จำนวน Donation ที่ยัง Pending
+                    // ยังไม่ได้รับเข้าคลัง
+                    // =================================================
+                    var pendingQuantity =
+                        await _context.Donations
+                            .Where(x =>
+                                x.CenterId == centerId &&
+                                x.Status == "Pending"
+                            )
+                            .SelectMany(x => x.Items)
+                            .Where(x =>
+                                x.ReliefItemId ==
+                                item.ReliefItemId
+                            )
+                            .SumAsync(x =>
+                                (int?)x.Quantity
+                            ) ?? 0;
+
+                    // ของที่มีจริง + ของที่กำลังรอรับ
+                    var currentAndPending =
+                        inventory.Quantity +
+                        pendingQuantity;
+
+                    // จำนวนที่ยังสามารถรับเพิ่มได้
+                    var remaining =
+                        inventory.MaximumQuantity -
+                        currentAndPending;
+
+                    // =================================================
+                    // ครบจำนวนที่ต้องการแล้ว
+                    // =================================================
+                    if (remaining <= 0)
+                    {
+                        return BadRequest(new
+                        {
+                            message =
+                                $"รายการ {reliefItem.Name} รับบริจาคครบจำนวนที่ต้องการแล้ว"
+                        });
+                    }
+
+                    // =================================================
+                    // ผู้ใช้กรอกเกินจำนวนที่ยังรับได้
+                    // =================================================
+                    if (item.Quantity > remaining)
+                    {
+                        return BadRequest(new
+                        {
+                            message =
+                                $"รายการ {reliefItem.Name} รับเพิ่มได้สูงสุดอีก {remaining} {reliefItem.Unit}"
+                        });
+                    }
+                }
+
+                // =====================================================
+                // เพิ่ม Donation Item
+                // =====================================================
                 donation.Items.Add(
                     new DonationItem
                     {
                         Id = nextDonationItemId,
-                        ReliefItemId = item.ReliefItemId,
-                        Quantity = item.Quantity,
-                        Unit = reliefItem.Unit
+                        ReliefItemId =
+                            item.ReliefItemId,
+                        Quantity =
+                            item.Quantity,
+                        Unit =
+                            reliefItem.Unit
                     }
                 );
 
                 nextDonationItemId =
                     PrimaryKeyHelper.IncrementId(
                         nextDonationItemId,
-                        "DonationItem");
+                        "DonationItem"
+                    );
             }
 
-            // URL ที่จะเปิดเมื่อสแกน QR Code
-            const string FrontendUrl = "http://localhost:3000";
+            // =====================================================
+            // URL สำหรับ QR Code
+            // =====================================================
+            const string FrontendUrl =
+                "http://localhost:3000";
 
             if (string.IsNullOrWhiteSpace(FrontendUrl))
             {
                 return StatusCode(500, new
                 {
-                    message = "FrontendUrl ยังไม่ได้ตั้งค่า"
+                    message =
+                        "FrontendUrl ยังไม่ได้ตั้งค่า"
                 });
             }
 
             var trackingUrl =
-            $"{FrontendUrl}/user/donor-tracking?id={Uri.EscapeDataString(donation.Id)}";
+                $"{FrontendUrl}/user/donor-tracking?id={Uri.EscapeDataString(donation.Id)}";
 
             using var qrGenerator =
                 new QRCodeGenerator();
@@ -142,16 +276,28 @@ namespace FloodRelief.Services.Donations
             donation.QRCode =
                 $"data:image/png;base64,{qrCodeBase64}";
 
+            // =====================================================
+            // Save
+            // =====================================================
             _context.Donations.Add(donation);
 
             await _context.SaveChangesAsync();
 
             return Ok(new
             {
-                message = "ส่งข้อมูลบริจาคสำเร็จ",
-                donationId = donation.Id,
+                message =
+                    "ส่งข้อมูลบริจาคสำเร็จ",
+
+                donationId =
+                    donation.Id,
+
+                centerId =
+                    donation.CenterId,
+
                 trackingUrl,
-                qrCode = donation.QRCode
+
+                qrCode =
+                    donation.QRCode
             });
         }
 
@@ -784,7 +930,34 @@ namespace FloodRelief.Services.Donations
                                 "CenterInventory"
                             );
                     }
+                    // ตรวจจำนวนสูงสุดอีกครั้งก่อนรับเข้าคลัง
+                    if (inventory.MaximumQuantity > 0)
+                    {
+                        var quantityAfterReceive =
+                            inventory.Quantity +
+                            donationItem.Quantity;
 
+                        if (quantityAfterReceive >
+                            inventory.MaximumQuantity)
+                        {
+                            await databaseTransaction.RollbackAsync();
+
+                            var remaining =
+                                Math.Max(
+                                    0,
+                                    inventory.MaximumQuantity -
+                                    inventory.Quantity
+                                );
+
+                            return BadRequest(new
+                            {
+                                message =
+                                    $"ไม่สามารถรับ {donationItem.ReliefItem?.Name ?? donationItem.ReliefItemId} เข้าคลังได้ " +
+                                    $"เนื่องจากเกินจำนวนสูงสุดที่กำหนด " +
+                                    $"ขณะนี้รับเพิ่มได้อีก {remaining} {donationItem.ReliefItem?.Unit ?? donationItem.Unit}"
+                            });
+                        }
+                    }
                     inventory.Quantity +=
                         donationItem.Quantity;
 

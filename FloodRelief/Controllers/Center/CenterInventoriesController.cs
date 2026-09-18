@@ -85,5 +85,15 @@ namespace FloodRelief.Controllers.Center
         {
             return await _service.GetLowStock();
         }
+        // PUT /api/CenterInventories/0000000001/thresholds
+        [HttpPut("{id}/thresholds")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> UpdateThresholds(
+            string id,
+            [FromBody] UpdateInventoryThresholdsDto dto
+        )
+        {
+            return await _service.UpdateThresholds(id, dto);
+        }
     }
 }

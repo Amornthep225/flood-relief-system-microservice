@@ -33,7 +33,9 @@ namespace FloodRelief.Services
                         : null,
                     x.Name,
                     x.Unit,
+                    x.MaximumRequestQuantity,
                     x.IsActive,
+                    x.IsDonationOpen,
                     x.CreatedAt
                 })
                 .ToListAsync();
@@ -42,8 +44,28 @@ namespace FloodRelief.Services
         }
 
         // GET: api/relief-items/active
-        public async Task<IActionResult> GetActiveItems()
+        public async Task<IActionResult> GetActiveItems(
+    string? centerId = null
+)
         {
+            // ระบบใช้ศูนย์เดียว
+            // ถ้าไม่ได้ส่ง centerId มา ให้เลือกศูนย์ที่เปิดใช้งานอยู่โดยอัตโนมัติ
+            var effectiveCenterId = centerId;
+
+            if (string.IsNullOrWhiteSpace(effectiveCenterId))
+            {
+                effectiveCenterId =
+                    await _context.Centers
+                        .AsNoTracking()
+                        .Where(x => x.IsActive)
+                        .OrderBy(x => x.Id)
+                        .Select(x => x.Id)
+                        .FirstOrDefaultAsync();
+            }
+
+            var hasCenter =
+                !string.IsNullOrWhiteSpace(effectiveCenterId);
+
             var items = await _context.ReliefItems
                 .AsNoTracking()
                 .Where(x =>
@@ -56,13 +78,125 @@ namespace FloodRelief.Services
                 {
                     x.Id,
                     x.ReliefCategoryId,
-                    CategoryName = x.ReliefCategory!.Name,
+
+                    CategoryName =
+                        x.ReliefCategory!.Name,
+
                     x.Name,
-                    x.Unit
+                    x.Unit,
+                    x.MaximumRequestQuantity,
+                    x.IsDonationOpen,
+
+                    // จำนวนที่มีจริงในคลัง
+                    CurrentQuantity =
+                        hasCenter
+                            ? (
+                                _context.CenterInventories
+                                    .Where(i =>
+                                        i.CenterId == effectiveCenterId &&
+                                        i.ReliefItemId == x.Id
+                                    )
+                                    .Select(i =>
+                                        (int?)i.Quantity
+                                    )
+                                    .FirstOrDefault()
+                                ?? 0
+                            )
+                            : 0,
+
+                    // จำนวนสูงสุดที่ Admin กำหนด
+                    MaximumQuantity =
+                        hasCenter
+                            ? (
+                                _context.CenterInventories
+                                    .Where(i =>
+                                        i.CenterId == effectiveCenterId &&
+                                        i.ReliefItemId == x.Id
+                                    )
+                                    .Select(i =>
+                                        (int?)i.MaximumQuantity
+                                    )
+                                    .FirstOrDefault()
+                                ?? 0
+                            )
+                            : 0,
+
+                    // จำนวนบริจาคที่กำลัง Pending
+                    PendingQuantity =
+                        hasCenter
+                            ? (
+                                _context.Donations
+                                    .Where(d =>
+                                        d.CenterId == effectiveCenterId &&
+                                        d.Status == "Pending"
+                                    )
+                                    .SelectMany(d =>
+                                        d.Items
+                                    )
+                                    .Where(di =>
+                                        di.ReliefItemId == x.Id
+                                    )
+                                    .Sum(di =>
+                                        (int?)di.Quantity
+                                    )
+                                ?? 0
+                            )
+                            : 0
                 })
                 .ToListAsync();
 
-            return Ok(items);
+            var result = items
+                .Select(x =>
+                {
+                    int? remainingQuantity = null;
+
+                    // MaximumQuantity = 0 หมายถึง ไม่จำกัด
+                    if (x.MaximumQuantity > 0)
+                    {
+                        remainingQuantity =
+                            Math.Max(
+                                0,
+                                x.MaximumQuantity -
+                                x.CurrentQuantity -
+                                x.PendingQuantity
+                            );
+                    }
+
+                    // บริจาคได้เมื่อ
+                    // 1. Admin เปิดรับ
+                    // 2. ยังไม่ถึงจำนวนสูงสุด
+                    var canDonate =
+                        x.IsDonationOpen &&
+                        (
+                            x.MaximumQuantity == 0 ||
+                            remainingQuantity > 0
+                        );
+
+                    return new
+                    {
+                        x.Id,
+                        x.ReliefCategoryId,
+                        x.CategoryName,
+                        x.Name,
+                        x.Unit,
+                        x.MaximumRequestQuantity,
+
+                        x.IsDonationOpen,
+
+                        x.CurrentQuantity,
+                        x.PendingQuantity,
+                        x.MaximumQuantity,
+
+                        RemainingQuantity =
+                            remainingQuantity,
+
+                        CanDonate =
+                            canDonate
+                    };
+                })
+                .ToList();
+
+            return Ok(result);
         }
 
         // GET: api/relief-items/category/food
@@ -94,7 +228,8 @@ namespace FloodRelief.Services
                     x.Id,
                     x.ReliefCategoryId,
                     x.Name,
-                    x.Unit
+                    x.Unit,
+                    x.MaximumRequestQuantity
                 })
                 .ToListAsync();
 
@@ -116,7 +251,9 @@ namespace FloodRelief.Services
                         : null,
                     x.Name,
                     x.Unit,
+                    x.MaximumRequestQuantity,
                     x.IsActive,
+                    x.IsDonationOpen,
                     x.CreatedAt
                 })
                 .FirstOrDefaultAsync();
@@ -158,16 +295,17 @@ namespace FloodRelief.Services
             }
 
             var duplicate = await _context.ReliefItems
-                .AnyAsync(x =>
-                    x.ReliefCategoryId == normalizedCategoryId &&
-                    x.Name == normalizedName
-                );
+             .AnyAsync(x =>
+                 x.Name == normalizedName &&
+                 x.Unit == normalizedUnit
+             );
 
             if (duplicate)
             {
                 return BadRequest(new
                 {
-                    message = "รายการสิ่งของนี้มีอยู่ในหมวดหมู่แล้ว"
+                    message =
+                        $"มีรายการ {normalizedName} หน่วย {normalizedUnit} อยู่แล้ว"
                 });
             }
 
@@ -189,7 +327,9 @@ namespace FloodRelief.Services
                     ReliefCategoryId = normalizedCategoryId,
                     Name = normalizedName,
                     Unit = normalizedUnit,
+                    MaximumRequestQuantity = dto.MaximumRequestQuantity,
                     IsActive = true,
+                    IsDonationOpen = dto.IsDonationOpen,
                     CreatedAt = DateTime.Now
                 };
 
@@ -210,6 +350,7 @@ namespace FloodRelief.Services
                             CategoryName = category.Name,
                             item.Name,
                             item.Unit,
+                            item.MaximumRequestQuantity,
                             item.IsActive,
                             item.CreatedAt
                         }
@@ -260,24 +401,26 @@ namespace FloodRelief.Services
             }
 
             var duplicate = await _context.ReliefItems
-                .AnyAsync(x =>
-                    x.Id != id &&
-                    x.ReliefCategoryId == normalizedCategoryId &&
-                    x.Name == normalizedName
-                );
+            .AnyAsync(x =>
+                x.Id != id &&
+                x.Name == normalizedName &&
+                x.Unit == normalizedUnit
+            );
 
             if (duplicate)
             {
                 return BadRequest(new
                 {
-                    message = "รายการสิ่งของนี้มีอยู่ในหมวดหมู่แล้ว"
+                    message =
+                        $"มีรายการ {normalizedName} หน่วย {normalizedUnit} อยู่แล้ว"
                 });
             }
 
             item.ReliefCategoryId = normalizedCategoryId;
             item.Name = normalizedName;
             item.Unit = normalizedUnit;
-
+            item.MaximumRequestQuantity = dto.MaximumRequestQuantity;
+            item.IsDonationOpen = dto.IsDonationOpen;
             await _context.SaveChangesAsync();
 
             return Ok(new
@@ -289,6 +432,7 @@ namespace FloodRelief.Services
                     item.ReliefCategoryId,
                     item.Name,
                     item.Unit,
+                    item.MaximumRequestQuantity,
                     item.IsActive,
                     item.CreatedAt
                 }
@@ -323,6 +467,46 @@ namespace FloodRelief.Services
                 {
                     item.Id,
                     item.IsActive
+                }
+            });
+        }
+        public async Task<IActionResult> UpdateDonationStatus(
+            string id,
+            UpdateReliefItemDonationStatusDto dto
+        )
+        {
+            var item = await _context.ReliefItems.FindAsync(id);
+
+            if (item == null)
+            {
+                return NotFound(new
+                {
+                    message = "ไม่พบรายการสิ่งของ"
+                });
+            }
+
+            if (dto.IsDonationOpen && !item.IsActive)
+            {
+                return BadRequest(new
+                {
+                    message = "ไม่สามารถเปิดรับบริจาคได้ เพราะรายการสิ่งของนี้ถูกปิดใช้งานอยู่"
+                });
+            }
+
+            item.IsDonationOpen = dto.IsDonationOpen;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = dto.IsDonationOpen
+                    ? "เปิดรับบริจาครายการนี้แล้ว"
+                    : "ปิดรับบริจาครายการนี้แล้ว",
+
+                data = new
+                {
+                    item.Id,
+                    item.IsDonationOpen
                 }
             });
         }

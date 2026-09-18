@@ -72,6 +72,8 @@ namespace FloodRelief.Services
 
                     x.UserRemark,
 
+                    x.ReceiveMethod,
+
                     x.StaffRemark,
 
 
@@ -194,6 +196,84 @@ namespace FloodRelief.Services
                 });
             }
 
+            var requestLimitErrors = dto.Items
+                .Select(dtoItem =>
+                {
+                    var reliefItem = reliefItems.First(x => x.Id == dtoItem.ReliefItemId);
+
+                    return new
+                    {
+                        Item = reliefItem,
+                        RequestedQuantity = dtoItem.Quantity,
+                        ExceedsLimit =
+                            reliefItem.MaximumRequestQuantity > 0 &&
+                            dtoItem.Quantity > reliefItem.MaximumRequestQuantity
+                    };
+                })
+                .Where(x => x.ExceedsLimit)
+                .ToList();
+
+            if (requestLimitErrors.Count > 0)
+            {
+                return BadRequest(new
+                {
+                    message = "จำนวนสิ่งของที่ขอเกินจำนวนสูงสุดที่กำหนด",
+                    items = requestLimitErrors.Select(x => new
+                    {
+                        reliefItemId = x.Item.Id,
+                        name = x.Item.Name,
+                        unit = x.Item.Unit,
+                        requestedQuantity = x.RequestedQuantity,
+                        maximumRequestQuantity = x.Item.MaximumRequestQuantity
+                    })
+                });
+            }
+
+            var receiveMethod = string.Equals(
+                dto.ReceiveMethod,
+                "Pickup",
+                StringComparison.OrdinalIgnoreCase
+            )
+                ? "Pickup"
+                : "Delivery";
+
+            FloodRelief.Models.Center? pickupCenter = null;
+
+            if (receiveMethod == "Pickup")
+            {
+                pickupCenter = await _context.Centers
+                    .AsNoTracking()
+                    .Where(x => x.IsActive)
+                    .OrderBy(x => x.Id)
+                    .FirstOrDefaultAsync();
+
+                if (pickupCenter == null)
+                {
+                    return BadRequest(new
+                    {
+                        message = "ไม่พบศูนย์ช่วยเหลือที่เปิดใช้งานสำหรับรับสิ่งของ"
+                    });
+                }
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(dto.AddressDetail))
+                {
+                    return BadRequest(new
+                    {
+                        message = "กรุณาระบุตำแหน่งสำหรับจัดส่งสิ่งของ"
+                    });
+                }
+
+                if (dto.Latitude == 0 && dto.Longitude == 0)
+                {
+                    return BadRequest(new
+                    {
+                        message = "กรุณาปักหมุดตำแหน่งสำหรับจัดส่งสิ่งของ"
+                    });
+                }
+            }
+
             await using var transaction =
                 await _context.Database.BeginTransactionAsync(
                     IsolationLevel.Serializable
@@ -210,11 +290,18 @@ namespace FloodRelief.Services
                     Id = requestId,
                     UserId = userId,
                     RequestType = "Relief",
-                    CenterId = null,
+                    ReceiveMethod = receiveMethod,
+                    CenterId = pickupCenter?.Id,
                     AssignedStaffId = null,
-                    Latitude = dto.Latitude,
-                    Longitude = dto.Longitude,
-                    AddressDetail = dto.AddressDetail.Trim(),
+                    Latitude = receiveMethod == "Pickup"
+                        ? pickupCenter!.Latitude
+                        : dto.Latitude,
+                    Longitude = receiveMethod == "Pickup"
+                        ? pickupCenter!.Longitude
+                        : dto.Longitude,
+                    AddressDetail = receiveMethod == "Pickup"
+                        ? pickupCenter!.Address
+                        : dto.AddressDetail!.Trim(),
                     UserRemark = dto.UserRemark?.Trim(),
                     Priority = SosPriorities.Normal,
                     Status = SosRequestStatuses.Pending,
@@ -270,6 +357,7 @@ namespace FloodRelief.Services
                     {
                         message = "ส่งคำขอความช่วยเหลือสำเร็จ",
                         sosRequestId = request.Id,
+                        receiveMethod = request.ReceiveMethod,
                         status = request.Status,
                         createdAt = request.CreatedAt
                     }
@@ -316,6 +404,14 @@ namespace FloodRelief.Services
                 });
             }
 
+            if (!SosSeverities.All.Contains(dto.Severity))
+            {
+                return BadRequest(new
+                {
+                    message = "ระดับความรุนแรงของผู้ประสบภัยไม่ถูกต้อง"
+                });
+            }
+
             if (dto.Latitude == 0 && dto.Longitude == 0)
             {
                 return BadRequest(new
@@ -324,17 +420,18 @@ namespace FloodRelief.Services
                 });
             }
 
-            var vulnerableTotal =
+            var accountedVictimTotal =
                 dto.ChildCount +
                 dto.ElderlyCount +
                 dto.DisabledCount +
-                dto.PatientCount;
+                dto.PatientCount +
+                dto.DeathCount;
 
-            if (vulnerableTotal > dto.VictimCount)
+            if (accountedVictimTotal > dto.VictimCount)
             {
                 return BadRequest(new
                 {
-                    message = "จำนวนเด็ก ผู้สูงอายุ ผู้พิการ และผู้ป่วยรวมกันต้องไม่เกินจำนวนผู้ประสบภัยทั้งหมด"
+                    message = "จำนวนเด็ก ผู้สูงอายุ ผู้พิการ ผู้ป่วย และผู้เสียชีวิตรวมกันต้องไม่เกินจำนวนผู้ประสบภัยทั้งหมด"
                 });
             }
 
@@ -355,6 +452,7 @@ namespace FloodRelief.Services
                     Id = requestId,
                     UserId = userId,
                     RequestType = "Emergency",
+                    ReceiveMethod = null,
                     CenterId = null,
                     AssignedStaffId = null,
                     Latitude = dto.Latitude,
@@ -366,6 +464,8 @@ namespace FloodRelief.Services
                     ElderlyCount = dto.ElderlyCount,
                     DisabledCount = dto.DisabledCount,
                     PatientCount = dto.PatientCount,
+                    DeathCount = dto.DeathCount,
+                    Severity = dto.Severity,
                     WaterLevel = dto.WaterLevel,
                     EmergencyDetail = dto.EmergencyDetail.Trim(),
                     UserRemark = dto.EmergencyDetail.Trim(),
@@ -420,6 +520,8 @@ namespace FloodRelief.Services
                         sosRequestId = request.Id,
                         requestType = request.RequestType,
                         emergencyType = request.EmergencyType,
+                        deathCount = request.DeathCount,
+                        severity = request.Severity,
                         priority = request.Priority,
                         status = request.Status,
                         createdAt = request.CreatedAt
@@ -538,12 +640,15 @@ namespace FloodRelief.Services
                     AddressDetail =
                         x.AddressDetail,
                     RequestType = x.RequestType,
+                    ReceiveMethod = x.ReceiveMethod,
                     EmergencyType = x.EmergencyType,
                     VictimCount = x.VictimCount,
                     ChildCount = x.ChildCount,
                     ElderlyCount = x.ElderlyCount,
                     DisabledCount = x.DisabledCount,
                     PatientCount = x.PatientCount,
+                    DeathCount = x.DeathCount,
+                    Severity = x.Severity,
                     WaterLevel = x.WaterLevel,
                     EmergencyDetail = x.EmergencyDetail,
                     Items = x.Items.Select(i => new SosRequestItemDto
@@ -617,12 +722,15 @@ namespace FloodRelief.Services
         x.Longitude,
         x.AddressDetail,
         x.RequestType,
+        x.ReceiveMethod,
         x.EmergencyType,
         x.VictimCount,
         x.ChildCount,
         x.ElderlyCount,
         x.DisabledCount,
         x.PatientCount,
+        x.DeathCount,
+        x.Severity,
         x.WaterLevel,
         x.EmergencyDetail,
         x.Priority,
@@ -748,12 +856,15 @@ namespace FloodRelief.Services
                     AddressDetail = x.AddressDetail,
 
                     RequestType = x.RequestType,
+                    ReceiveMethod = x.ReceiveMethod,
                     EmergencyType = x.EmergencyType,
                     VictimCount = x.VictimCount,
                     ChildCount = x.ChildCount,
                     ElderlyCount = x.ElderlyCount,
                     DisabledCount = x.DisabledCount,
                     PatientCount = x.PatientCount,
+                    DeathCount = x.DeathCount,
+                    Severity = x.Severity,
                     WaterLevel = x.WaterLevel,
                     EmergencyDetail = x.EmergencyDetail,
 
@@ -856,6 +967,11 @@ namespace FloodRelief.Services
             }
 
             var currentUserId = _currentUser.UserId;
+            var isPickupRequest = string.Equals(
+                request.ReceiveMethod,
+                "Pickup",
+                StringComparison.OrdinalIgnoreCase
+            );
 
             /*
              * Staff กดรับงานด้วยตัวเอง
@@ -898,6 +1014,25 @@ namespace FloodRelief.Services
                     });
                 }
 
+                if (
+                    isPickupRequest &&
+                    !string.Equals(
+                        staff.CenterId,
+                        request.CenterId,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                {
+                    return StatusCode(
+                        StatusCodes.Status403Forbidden,
+                        new
+                        {
+                            message =
+                                "คำขอรับเองที่ศูนย์นี้ต้องดำเนินการโดยเจ้าหน้าที่ของศูนย์ที่ระบุในคำขอ"
+                        }
+                    );
+                }
+
                 request.CenterId = staff.CenterId;
                 request.AssignedStaffId = staff.Id;
             }
@@ -912,6 +1047,22 @@ namespace FloodRelief.Services
                     return BadRequest(new
                     {
                         message = "Admin ต้องระบุศูนย์และเจ้าหน้าที่"
+                    });
+                }
+
+                if (
+                    isPickupRequest &&
+                    !string.Equals(
+                        dto.CenterId,
+                        request.CenterId,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                {
+                    return BadRequest(new
+                    {
+                        message =
+                            "คำขอรับเองที่ศูนย์นี้ไม่สามารถเปลี่ยนไปใช้ศูนย์อื่นได้"
                     });
                 }
 
@@ -1459,16 +1610,27 @@ namespace FloodRelief.Services
                             x => x.Id,
                             "Notification");
 
-                    // แจ้งผู้ขอรับของว่าสิ่งของกำลังนำส่ง
+                    var isPickupRequest = string.Equals(
+                        request.ReceiveMethod,
+                        "Pickup",
+                        StringComparison.OrdinalIgnoreCase
+                    );
+
+                    // แจ้งผู้ขอรับของตามวิธีรับสิ่งของ
                     _context.Notifications.Add(
                         new FloodRelief.Models.Notification
                         {
                             Id = nextNotificationId,
                             UserId = request.UserId,
-                            Type = "ReliefDelivering",
-                            Title = "สิ่งของกำลังเดินทางไปหาคุณ",
-                            Message =
-                                $"คำขอรับสิ่งของ #{request.Id} กำลังนำส่งไปยังตำแหน่งที่คุณระบุ กรุณาเตรียมรับสิ่งของ",
+                            Type = isPickupRequest
+                                ? "ReliefReadyForPickup"
+                                : "ReliefDelivering",
+                            Title = isPickupRequest
+                                ? "สิ่งของพร้อมให้รับที่ศูนย์แล้ว"
+                                : "สิ่งของกำลังเดินทางไปหาคุณ",
+                            Message = isPickupRequest
+                                ? $"คำขอรับสิ่งของ #{request.Id} จัดเตรียมเรียบร้อยแล้ว กรุณามารับสิ่งของที่ศูนย์ที่รับผิดชอบ"
+                                : $"คำขอรับสิ่งของ #{request.Id} กำลังนำส่งไปยังตำแหน่งที่คุณระบุ กรุณาเตรียมรับสิ่งของ",
                             ReferenceType = "SosRequest",
                             ReferenceId = request.Id,
                             IsRead = false,
@@ -1570,8 +1732,9 @@ namespace FloodRelief.Services
 
                     return Ok(new
                     {
-                        message =
-                            "อัปเดตเป็นกำลังจัดส่งและตัดสต็อกสำเร็จ",
+                        message = isPickupRequest
+                            ? "เตรียมสิ่งของพร้อมให้รับที่ศูนย์และตัดสต็อกสำเร็จ"
+                            : "อัปเดตเป็นกำลังจัดส่งและตัดสต็อกสำเร็จ",
 
                         data = new
                         {
@@ -1637,10 +1800,22 @@ namespace FloodRelief.Services
                                 : "ReliefCompleted",
                             Title = isEmergencyCompleted
                                 ? "เคส SOS ได้รับการช่วยเหลือเรียบร้อยแล้ว"
-                                : "ส่งมอบสิ่งของเรียบร้อยแล้ว",
+                                : string.Equals(
+                                    request.ReceiveMethod,
+                                    "Pickup",
+                                    StringComparison.OrdinalIgnoreCase
+                                )
+                                    ? "รับสิ่งของเรียบร้อยแล้ว"
+                                    : "ส่งมอบสิ่งของเรียบร้อยแล้ว",
                             Message = isEmergencyCompleted
                                 ? $"เคส SOS #{request.Id} ถูกปิดหลังจากดำเนินการช่วยเหลือเรียบร้อยแล้ว"
-                                : $"คำขอรับสิ่งของ #{request.Id} ถูกส่งมอบเรียบร้อยแล้ว ขอบคุณที่ใช้ระบบ Flood Relief",
+                                : string.Equals(
+                                    request.ReceiveMethod,
+                                    "Pickup",
+                                    StringComparison.OrdinalIgnoreCase
+                                )
+                                    ? $"คำขอรับสิ่งของ #{request.Id} รับสิ่งของที่ศูนย์เรียบร้อยแล้ว ขอบคุณที่ใช้ระบบ Flood Relief"
+                                    : $"คำขอรับสิ่งของ #{request.Id} ถูกส่งมอบเรียบร้อยแล้ว ขอบคุณที่ใช้ระบบ Flood Relief",
                             ReferenceType = "SosRequest",
                             ReferenceId = request.Id,
                             IsRead = false,
@@ -2074,12 +2249,15 @@ namespace FloodRelief.Services
                 Longitude = x.Longitude,
                 AddressDetail = x.AddressDetail,
                 RequestType = x.RequestType,
+                ReceiveMethod = x.ReceiveMethod,
                 EmergencyType = x.EmergencyType,
                 VictimCount = x.VictimCount,
                 ChildCount = x.ChildCount,
                 ElderlyCount = x.ElderlyCount,
                 DisabledCount = x.DisabledCount,
                 PatientCount = x.PatientCount,
+                    DeathCount = x.DeathCount,
+                Severity = x.Severity,
                 WaterLevel = x.WaterLevel,
                 EmergencyDetail = x.EmergencyDetail,
                 Items = x.Items.Select(i => new SosRequestItemDto
@@ -2168,12 +2346,15 @@ namespace FloodRelief.Services
                     Longitude = x.Longitude,
                     AddressDetail = x.AddressDetail,
                     RequestType = x.RequestType,
+                    ReceiveMethod = x.ReceiveMethod,
                     EmergencyType = x.EmergencyType,
                     VictimCount = x.VictimCount,
                     ChildCount = x.ChildCount,
                     ElderlyCount = x.ElderlyCount,
                     DisabledCount = x.DisabledCount,
                     PatientCount = x.PatientCount,
+                    DeathCount = x.DeathCount,
+                    Severity = x.Severity,
                     WaterLevel = x.WaterLevel,
                     EmergencyDetail = x.EmergencyDetail,
                     Items = x.Items.Select(i => new SosRequestItemDto
@@ -2288,12 +2469,15 @@ namespace FloodRelief.Services
                         : null,
                     AddressDetail = x.AddressDetail,
                     RequestType = x.RequestType,
+                    ReceiveMethod = x.ReceiveMethod,
                     EmergencyType = x.EmergencyType,
                     VictimCount = x.VictimCount,
                     ChildCount = x.ChildCount,
                     ElderlyCount = x.ElderlyCount,
                     DisabledCount = x.DisabledCount,
                     PatientCount = x.PatientCount,
+                    DeathCount = x.DeathCount,
+                    Severity = x.Severity,
                     WaterLevel = x.WaterLevel,
                     EmergencyDetail = x.EmergencyDetail,
                     Items = x.Items.Select(i => new SosRequestItemDto
@@ -2314,7 +2498,7 @@ namespace FloodRelief.Services
             return Ok(requests);
         }
         public async Task<IActionResult> CheckStockBeforeAccept(
-    string id)
+    string id, string? requestedCenterId)
         {
             if (string.IsNullOrWhiteSpace(id))
             {

@@ -9,6 +9,7 @@ using FloodRelief.Services;
 
 namespace FloodRelief.Controllers
 {
+    //[Route("api/[controller]")]
     [Route("api/relief-items")]
     [ApiController]
     public class ReliefItemsController : ControllerBase
@@ -28,9 +29,11 @@ namespace FloodRelief.Controllers
         }
         // GET: api/relief-items/active
         [HttpGet("active")]
-        public async Task<IActionResult> GetActiveItems()
+        public async Task<IActionResult> GetActiveItems(
+        [FromQuery] string? centerId = null
+        )
         {
-            return await _service.GetActiveItems();
+            return await _service.GetActiveItems(centerId);
         }
         // GET: api/relief-items/category/food
         [HttpGet("category/{categoryId}")]
@@ -69,6 +72,16 @@ namespace FloodRelief.Controllers
         [FromBody] UpdateReliefItemStatusDto dto)
         {
             return await _service.UpdateItemStatus(id, dto);
+        }
+        // PUT: api/relief-items/00001/donation-status
+        [HttpPut("{id}/donation-status")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> UpdateDonationStatus(
+            string id,
+            [FromBody] UpdateReliefItemDonationStatusDto dto
+        )
+        {
+            return await _service.UpdateDonationStatus(id, dto);
         }
         // DELETE: api/relief-items/00001
         [HttpDelete("{id}")]

@@ -12,5 +12,10 @@ namespace FloodRelief.DTOs.Relief
 
         [Required]
         public string Unit { get; set; } = string.Empty;
+
+        [Range(0, int.MaxValue, ErrorMessage = "จำนวนสูงสุดต่อคำขอต้องเป็น 0 หรือมากกว่า")]
+        public int MaximumRequestQuantity { get; set; } = 0;
+
+        public bool IsDonationOpen { get; set; } = true;
     }
 }

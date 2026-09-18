@@ -31,6 +31,10 @@ namespace FloodRelief.Models
         [StringLength(20)]
         public string RequestType { get; set; } = "Relief";
 
+        // Relief only: Delivery = เจ้าหน้าที่จัดส่ง, Pickup = ผู้ใช้มารับเองที่ศูนย์
+        [StringLength(20)]
+        public string? ReceiveMethod { get; set; }
+
         [StringLength(50)]
         public string? EmergencyType { get; set; }
 
@@ -43,6 +47,11 @@ namespace FloodRelief.Models
         public int DisabledCount { get; set; }
 
         public int PatientCount { get; set; }
+
+        public int DeathCount { get; set; }
+
+        [StringLength(20)]
+        public string? Severity { get; set; }
 
         [Column(TypeName = "decimal(5,2)")]
         public decimal? WaterLevel { get; set; }

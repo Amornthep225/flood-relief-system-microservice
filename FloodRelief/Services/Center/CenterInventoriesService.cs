@@ -78,7 +78,7 @@ namespace FloodRelief.Services.Center
 
                         x.Quantity,
                         x.MinimumQuantity,
-
+                        x.MaximumQuantity,
                         stockStatus =
                             x.Quantity <= 0
                                 ? "OutOfStock"
@@ -591,7 +591,7 @@ namespace FloodRelief.Services.Center
 
                         x.Quantity,
                         x.MinimumQuantity,
-
+                        x.MaximumQuantity,
                         stockStatus =
                             x.Quantity <= 0
                                 ? "OutOfStock"
@@ -601,6 +601,59 @@ namespace FloodRelief.Services.Center
 
             return Ok(inventories);
         }
+        public async Task<IActionResult> UpdateThresholds(
+            string id,
+            UpdateInventoryThresholdsDto dto
+            )
+        {
+            var inventory =
+                await _context.CenterInventories.FindAsync(id);
+
+            if (inventory == null)
+            {
+                return NotFound(new
+                {
+                    message = "ไม่พบรายการคลังสินค้า"
+                });
+            }
+
+            if (
+                dto.MaximumQuantity > 0 &&
+                dto.MaximumQuantity < dto.MinimumQuantity
+            )
+            {
+                return BadRequest(new
+                {
+                    message =
+                        "จำนวนสูงสุดต้องมากกว่าหรือเท่ากับจำนวนขั้นต่ำ"
+                });
+            }
+
+            inventory.MinimumQuantity =
+                dto.MinimumQuantity;
+
+            inventory.MaximumQuantity =
+                dto.MaximumQuantity;
+
+            inventory.UpdatedAt = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message =
+                    "แก้ไขจำนวนขั้นต่ำและจำนวนสูงสุดสำเร็จ",
+
+                data = new
+                {
+                    inventory.Id,
+                    inventory.Quantity,
+                    inventory.MinimumQuantity,
+                    inventory.MaximumQuantity
+                }
+            });
+        }
 
     }
+
 }

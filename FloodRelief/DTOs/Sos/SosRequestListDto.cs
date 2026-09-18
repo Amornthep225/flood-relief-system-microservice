@@ -25,6 +25,8 @@ namespace FloodRelief.DTOs.Sos
 
         public string RequestType { get; set; } = "Relief";
 
+        public string? ReceiveMethod { get; set; }
+
         public string? EmergencyType { get; set; }
 
         public int VictimCount { get; set; }
@@ -36,6 +38,10 @@ namespace FloodRelief.DTOs.Sos
         public int DisabledCount { get; set; }
 
         public int PatientCount { get; set; }
+
+        public int DeathCount { get; set; }
+
+        public string? Severity { get; set; }
 
         public decimal? WaterLevel { get; set; }
 

@@ -1,4 +1,4 @@
-﻿namespace FloodRelief.DTOs.Sos
+namespace FloodRelief.DTOs.Sos
 {
     public class SosRequestItemDto
     {
@@ -9,6 +9,8 @@
         public string ReliefItemName { get; set; } = string.Empty;
 
         public int Quantity { get; set; }
+
+        public int? ApprovedQuantity { get; set; }
 
         public string Unit { get; set; } = string.Empty;
     }
