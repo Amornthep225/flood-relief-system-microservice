@@ -118,6 +118,8 @@ namespace FloodRelief.Services
 
                         i.Quantity,
 
+                        i.ApprovedQuantity,
+
                         i.Unit
                     })
 
@@ -657,6 +659,7 @@ namespace FloodRelief.Services
                         ReliefItemId = i.ReliefItemId,
                         ReliefItemName = i.ReliefItem != null ? i.ReliefItem.Name : "ไม่ระบุ",
                         Quantity = i.Quantity,
+                        ApprovedQuantity = i.ApprovedQuantity,
                         Unit = i.Unit
                     }).ToList(),
                     Priority =
@@ -914,7 +917,7 @@ namespace FloodRelief.Services
 
 
                             Quantity = i.Quantity,
-
+                            ApprovedQuantity = i.ApprovedQuantity,
 
                             Unit = i.Unit
 
@@ -1111,6 +1114,33 @@ namespace FloodRelief.Services
             }
 
             var now = DateTime.Now;
+
+            // บันทึกจำนวนที่อนุมัติรายรายการ (รองรับอนุมัติบางส่วน)
+            if (dto.ApprovedItems != null && dto.ApprovedItems.Count > 0)
+            {
+                var requestItems = await _context.SosRequestItems
+                    .Where(x => x.SosRequestId == request.Id)
+                    .ToListAsync();
+
+                foreach (var approvedItem in dto.ApprovedItems)
+                {
+                    var targetItem = requestItems
+                        .FirstOrDefault(x => 
+                            x.Id == approvedItem.SosRequestItemId ||
+                            x.ReliefItemId == approvedItem.SosRequestItemId
+                        );
+
+                    if (targetItem == null)
+                    {
+                        return BadRequest(new
+                        {
+                            message = $"ไม่พบรายการสิ่งของ {approvedItem.SosRequestItemId}"
+                        });
+                    }
+
+                    targetItem.ApprovedQuantity = approvedItem.ApprovedQuantity;
+                }
+            }
 
             request.StaffRemark = dto.StaffRemark?.Trim();
             request.Status = SosRequestStatuses.Accepted;
@@ -1390,7 +1420,7 @@ namespace FloodRelief.Services
                     .Select(group => new
                     {
                         ReliefItemId = group.Key,
-                        Quantity = group.Sum(x => x.Quantity),
+                        Quantity = group.Sum(x => x.ApprovedQuantity ?? x.Quantity),
                         ReliefItemName = group
                             .Select(x => x.ReliefItem != null
                                 ? x.ReliefItem.Name
@@ -2266,6 +2296,7 @@ namespace FloodRelief.Services
                     ReliefItemId = i.ReliefItemId,
                     ReliefItemName = i.ReliefItem != null ? i.ReliefItem.Name : "ไม่ระบุ",
                     Quantity = i.Quantity,
+                    ApprovedQuantity = i.ApprovedQuantity,
                     Unit = i.Unit
                 }).ToList(),
                 Priority = x.Priority,
@@ -2363,6 +2394,7 @@ namespace FloodRelief.Services
                         ReliefItemId = i.ReliefItemId,
                         ReliefItemName = i.ReliefItem != null ? i.ReliefItem.Name : "ไม่ระบุ",
                         Quantity = i.Quantity,
+                        ApprovedQuantity = i.ApprovedQuantity,
                         Unit = i.Unit
                     }).ToList(),
                     Priority = x.Priority,
@@ -2486,6 +2518,7 @@ namespace FloodRelief.Services
                         ReliefItemId = i.ReliefItemId,
                         ReliefItemName = i.ReliefItem != null ? i.ReliefItem.Name : "ไม่ระบุ",
                         Quantity = i.Quantity,
+                        ApprovedQuantity = i.ApprovedQuantity,
                         Unit = i.Unit
                     }).ToList(),
                     Priority = x.Priority,
