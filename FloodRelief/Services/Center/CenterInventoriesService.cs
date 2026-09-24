@@ -489,7 +489,7 @@ namespace FloodRelief.Services.Center
                 return NotFound(new
                 {
                     message =
-                        "ไม่พบรายการคลังสินค้า"
+                        "ไม่พบรายการคลังสิ่งของ"
                 });
             }
 
@@ -526,7 +526,7 @@ namespace FloodRelief.Services.Center
                 return NotFound(new
                 {
                     message =
-                        "ไม่พบรายการคลังสินค้า"
+                        "ไม่พบรายการคลังสิ่งของ"
                 });
             }
 
@@ -613,7 +613,7 @@ namespace FloodRelief.Services.Center
             {
                 return NotFound(new
                 {
-                    message = "ไม่พบรายการคลังสินค้า"
+                    message = "ไม่พบรายการคลังสิ่งของ"
                 });
             }
 

@@ -1416,20 +1416,24 @@ namespace FloodRelief.Services
                  * เพื่อป้องกันการตรวจสต็อกผิดพลาด
                  */
                 var requestedItems = request.Items
-                    .GroupBy(x => x.ReliefItemId)
-                    .Select(group => new
-                    {
-                        ReliefItemId = group.Key,
-                        Quantity = group.Sum(x => x.ApprovedQuantity ?? x.Quantity),
-                        ReliefItemName = group
-                            .Select(x => x.ReliefItem != null
-                                ? x.ReliefItem.Name
-                                : null)
-                            .FirstOrDefault(x =>
-                                !string.IsNullOrWhiteSpace(x))
-                            ?? group.Key
-                    })
-                    .ToList();
+    .GroupBy(x => x.ReliefItemId)
+    .Select(group => new
+    {
+        ReliefItemId = group.Key,
+
+        ApprovedQuantity = group.Sum(x =>
+            x.ApprovedQuantity ?? 0
+        ),
+
+        ReliefItemName = group
+            .Select(x => x.ReliefItem != null
+                ? x.ReliefItem.Name
+                : null)
+            .FirstOrDefault(x =>
+                !string.IsNullOrWhiteSpace(x))
+            ?? group.Key
+    })
+    .ToList();
 
                 var reliefItemIds = requestedItems
                     .Select(x => x.ReliefItemId)
@@ -1467,7 +1471,7 @@ namespace FloodRelief.Services
                                 item.ReliefItemId,
                                 item.ReliefItemName,
                                 RequestedQuantity =
-                                    item.Quantity,
+                             item.ApprovedQuantity,
                                 AvailableQuantity =
                                     inventory?.Quantity ?? 0
                             };
@@ -1508,13 +1512,26 @@ namespace FloodRelief.Services
 
                     foreach (var requestedItem in requestedItems)
                     {
-                        var inventory = inventories.First(x =>
-                            x.ReliefItemId ==
-                            requestedItem.ReliefItemId
+                        // ไม่อนุมัติ ไม่ต้องตัดคลัง
+                        if (requestedItem.ApprovedQuantity <= 0)
+                        {
+                            continue;
+                        }
+
+                        var inventory = inventories.FirstOrDefault(x =>
+                            x.ReliefItemId == requestedItem.ReliefItemId
                         );
 
-                        inventory.Quantity -=
-                            requestedItem.Quantity;
+                        if (inventory == null)
+                        {
+                            throw new Exception(
+                                $"ไม่พบคลังสำหรับของบริจาค ID {requestedItem.ReliefItemId}"
+                            );
+                        }
+
+                        // ตัดเฉพาะจำนวนที่อนุมัติ
+                        inventory.Quantity -= requestedItem.ApprovedQuantity;
+
 
                         inventory.UpdatedAt = now;
 
@@ -1530,7 +1547,7 @@ namespace FloodRelief.Services
                                     "SOSOut",
 
                                 Quantity =
-                                    requestedItem.Quantity,
+                                requestedItem.ApprovedQuantity,
 
                                 BalanceAfter =
                                     inventory.Quantity,
@@ -1567,7 +1584,7 @@ namespace FloodRelief.Services
                          */
                         {
                             var remainingToTrace =
-                                requestedItem.Quantity;
+                                requestedItem.ApprovedQuantity;
 
                             var donationBatches = await _context.DonationBatches
                                 .Include(x => x.Donation)
