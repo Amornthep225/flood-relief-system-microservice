@@ -2548,7 +2548,8 @@ namespace FloodRelief.Services
             return Ok(requests);
         }
         public async Task<IActionResult> CheckStockBeforeAccept(
-    string id, string? requestedCenterId)
+    string id,
+    string? centerId)
         {
             if (string.IsNullOrWhiteSpace(id))
             {
@@ -2559,18 +2560,22 @@ namespace FloodRelief.Services
             }
 
             // ==========================================
-            // 1. หา Center ของ Staff ที่ Login อยู่
+            // 1. หา Center จากที่เลือก หรือ Staff ที่ Login
             // ==========================================
 
-            var centerId = _currentUser.CenterId;
+            var selectedCenterId =
+                !string.IsNullOrWhiteSpace(centerId)
+                    ? centerId
+                    : _currentUser.CenterId;
 
-            if (string.IsNullOrWhiteSpace(centerId))
+            if (string.IsNullOrWhiteSpace(selectedCenterId))
             {
                 return BadRequest(new
                 {
                     message = "ไม่พบศูนย์ของเจ้าหน้าที่"
                 });
             }
+
 
             // ==========================================
             // 2. หา SOS พร้อมรายการสิ่งของที่ร้องขอ
@@ -2582,6 +2587,7 @@ namespace FloodRelief.Services
                     .ThenInclude(x => x.ReliefItem)
                 .FirstOrDefaultAsync(x => x.Id == id);
 
+
             if (sosRequest == null)
             {
                 return NotFound(new
@@ -2589,6 +2595,7 @@ namespace FloodRelief.Services
                     message = "ไม่พบคำขอความช่วยเหลือ"
                 });
             }
+
 
             // ==========================================
             // 3. ต้องยังเป็นเคสที่รับได้
@@ -2605,6 +2612,7 @@ namespace FloodRelief.Services
                 });
             }
 
+
             if (string.Equals(
                 sosRequest.RequestType,
                 "Emergency",
@@ -2613,11 +2621,12 @@ namespace FloodRelief.Services
                 return Ok(new SosStockCheckResponseDto
                 {
                     SosRequestId = sosRequest.Id,
-                    CenterId = centerId,
+                    CenterId = selectedCenterId,
                     IsAllEnough = true,
                     Items = new List<SosStockCheckItemDto>()
                 });
             }
+
 
             // ==========================================
             // 4. เอา ReliefItemId ที่ SOS ต้องการ
@@ -2628,16 +2637,18 @@ namespace FloodRelief.Services
                 .Distinct()
                 .ToList();
 
+
             // ==========================================
-            // 5. ดึง Inventory ของศูนย์ Staff
+            // 5. ดึง Inventory ของศูนย์ที่เลือก
             // ==========================================
 
             var inventories = await _context.CenterInventories
                 .AsNoTracking()
                 .Where(x =>
-                    x.CenterId == centerId &&
+                    x.CenterId == selectedCenterId &&
                     reliefItemIds.Contains(x.ReliefItemId))
                 .ToListAsync();
+
 
             // ==========================================
             // 6. เปรียบเทียบ SOS กับ Inventory
@@ -2648,30 +2659,24 @@ namespace FloodRelief.Services
                 {
                     var inventory = inventories
                         .FirstOrDefault(x =>
-                            x.ReliefItemId ==
-                            item.ReliefItemId);
+                            x.ReliefItemId == item.ReliefItemId);
 
-                    var requestedQuantity =
-                        item.Quantity;
+
+                    var requestedQuantity = item.Quantity;
 
                     var availableQuantity =
                         inventory?.Quantity ?? 0;
 
-                    var isEnough =
-                        availableQuantity >=
-                        requestedQuantity;
 
                     return new SosStockCheckItemDto
                     {
-                        ReliefItemId =
-                            item.ReliefItemId,
+                        ReliefItemId = item.ReliefItemId,
 
                         ReliefItemName =
                             item.ReliefItem?.Name
                             ?? "ไม่ระบุ",
 
-                        Unit =
-                            item.Unit ?? "",
+                        Unit = item.Unit ?? "",
 
                         RequestedQuantity =
                             requestedQuantity,
@@ -2692,34 +2697,29 @@ namespace FloodRelief.Services
                                 0),
 
                         IsEnough =
-                            isEnough
+                            availableQuantity >= requestedQuantity
                     };
                 })
                 .ToList();
 
+
             // ==========================================
-            // 7. ต้องพอทุกรายการ
+            // 7. Response
             // ==========================================
 
-            var isAllEnough =
-                items.Count > 0 &&
-                items.All(x => x.IsEnough);
+            var response = new SosStockCheckResponseDto
+            {
+                SosRequestId = sosRequest.Id,
 
-            var response =
-                new SosStockCheckResponseDto
-                {
-                    SosRequestId =
-                        sosRequest.Id,
+                CenterId = selectedCenterId,
 
-                    CenterId =
-                        centerId,
+                IsAllEnough =
+                    items.Count > 0 &&
+                    items.All(x => x.IsEnough),
 
-                    IsAllEnough =
-                        isAllEnough,
+                Items = items
+            };
 
-                    Items =
-                        items
-                };
 
             return Ok(response);
         }
