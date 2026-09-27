@@ -1,0 +1,36 @@
+services:
+
+  floodrelief-api:
+    image: floodrelief-api:latest
+    container_name: floodrelief-api
+    ports:
+      - "7000:8080"
+
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+
+    depends_on:
+      - mysql
+
+
+  mysql:
+    image: mysql:8.4
+
+    container_name: floodrelief-mysql
+
+    restart: always
+
+    environment:
+      MYSQL_DATABASE: FloodReliefDB
+      MYSQL_ROOT_PASSWORD: password
+
+    ports:
+      - "3307:3306"
+
+    volumes:
+      - floodrelief_mysql_data:/var/lib/mysql
+
+
+volumes:
+
+  floodrelief_mysql_data:

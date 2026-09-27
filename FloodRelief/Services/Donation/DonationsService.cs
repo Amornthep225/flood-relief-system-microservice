@@ -16,15 +16,19 @@ namespace FloodRelief.Services.Donations
         private readonly AppDbContext _context;
         private readonly CurrentUserService _currentUser;
         private readonly NotificationRealtimeService _notificationRealtime;
+        private readonly IConfiguration _configuration;
+
 
         public DonationsService(
             AppDbContext context,
             CurrentUserService currentUser,
-            NotificationRealtimeService notificationRealtime)
+            NotificationRealtimeService notificationRealtime,
+            IConfiguration configuration)
         {
             _context = context;
             _currentUser = currentUser;
             _notificationRealtime = notificationRealtime;
+            _configuration = configuration;
         }
 
 
@@ -245,8 +249,8 @@ namespace FloodRelief.Services.Donations
             // =====================================================
             // URL สำหรับ QR Code
             // =====================================================
-            const string FrontendUrl =
-                "http://localhost:3000";
+            var FrontendUrl =
+            _configuration["FrontendUrl"];
 
             if (string.IsNullOrWhiteSpace(FrontendUrl))
             {

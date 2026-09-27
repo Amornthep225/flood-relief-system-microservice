@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FloodRelief.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260918165357_SyncCurrentModel")]
-    partial class SyncCurrentModel
+    [Migration("20260925101851_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
