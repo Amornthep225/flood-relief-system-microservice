@@ -601,6 +601,168 @@ namespace FloodRelief.Services.Center
 
             return Ok(inventories);
         }
+        // รายงานการเคลื่อนไหวคลัง พร้อมที่มาและปลายทาง
+        // GET /api/CenterInventories/report/movements
+        public async Task<IActionResult> GetMovementReport()
+        {
+            var transactions = await _context.InventoryTransactions
+                .AsNoTracking()
+                .Include(x => x.CenterInventory)
+                    .ThenInclude(x => x.Center)
+                .Include(x => x.CenterInventory)
+                    .ThenInclude(x => x.ReliefItem)
+                .Include(x => x.Staff)
+                .OrderByDescending(x => x.CreatedAt)
+                .ThenByDescending(x => x.Id)
+                .ToListAsync();
+
+            var donationIds = transactions
+                .Where(x => string.Equals(
+                    x.ReferenceType,
+                    "Donation",
+                    StringComparison.OrdinalIgnoreCase))
+                .Select(x => x.ReferenceId)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct()
+                .Cast<string>()
+                .ToList();
+
+            var sosIds = transactions
+                .Where(x =>
+                    string.Equals(x.ReferenceType, "SOS", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(x.ReferenceType, "SosRequest", StringComparison.OrdinalIgnoreCase))
+                .Select(x => x.ReferenceId)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct()
+                .Cast<string>()
+                .ToList();
+
+            var donationMap = await _context.Donations
+                .AsNoTracking()
+                .Include(x => x.User)
+                .Where(x => donationIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id);
+
+            var sosMap = await _context.SosRequests
+                .AsNoTracking()
+                .Include(x => x.User)
+                .Where(x => sosIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id);
+
+            var rows = new List<InventoryMovementReportDto>();
+
+            foreach (var tx in transactions)
+            {
+                var inventory = tx.CenterInventory;
+                var centerName = inventory?.Center?.CenterName ?? "-";
+                var itemName = inventory?.ReliefItem?.Name ?? "-";
+                var unit = inventory?.ReliefItem?.Unit ?? "หน่วย";
+                var isInbound = IsInboundTransaction(tx.TransactionType);
+                var balanceBefore = isInbound
+                    ? Math.Max(0, tx.BalanceAfter - tx.Quantity)
+                    : tx.BalanceAfter + tx.Quantity;
+
+                var sourceType = isInbound ? "External" : "Center";
+                var sourceName = isInbound ? (tx.Note ?? "รับเข้าคลัง") : centerName;
+                string? sourceReference = null;
+
+                var destinationType = isInbound ? "Center" : "External";
+                var destinationName = isInbound ? centerName : (tx.Note ?? "จ่ายออกจากคลัง");
+                string? destinationReference = null;
+                string? destinationAddress = null;
+
+                if (!string.IsNullOrWhiteSpace(tx.ReferenceId) &&
+                    string.Equals(tx.ReferenceType, "Donation", StringComparison.OrdinalIgnoreCase) &&
+                    donationMap.TryGetValue(tx.ReferenceId, out var donation))
+                {
+                    sourceType = "Donation";
+                    sourceName = donation.User?.FullName ?? "ผู้บริจาค";
+                    sourceReference = $"Donation #{donation.Id}";
+                    destinationType = "Center";
+                    destinationName = centerName;
+                    destinationReference = inventory?.CenterId;
+                }
+                else if (!string.IsNullOrWhiteSpace(tx.ReferenceId) &&
+                    (string.Equals(tx.ReferenceType, "SOS", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(tx.ReferenceType, "SosRequest", StringComparison.OrdinalIgnoreCase)) &&
+                    sosMap.TryGetValue(tx.ReferenceId, out var sosRequest))
+                {
+                    sourceType = "Center";
+                    sourceName = centerName;
+                    sourceReference = inventory?.CenterId;
+
+                    destinationType = string.Equals(
+                        sosRequest.RequestType,
+                        "Emergency",
+                        StringComparison.OrdinalIgnoreCase)
+                            ? "EmergencySOS"
+                            : "ReliefRequest";
+                    destinationName = sosRequest.User?.FullName ?? "ผู้ขอรับความช่วยเหลือ";
+                    destinationReference = $"SOS #{sosRequest.Id}";
+                    destinationAddress = sosRequest.AddressDetail;
+                }
+                else
+                {
+                    if (!string.IsNullOrWhiteSpace(tx.ReferenceType))
+                    {
+                        if (isInbound)
+                        {
+                            sourceType = tx.ReferenceType;
+                            sourceReference = tx.ReferenceId;
+                        }
+                        else
+                        {
+                            destinationType = tx.ReferenceType;
+                            destinationReference = tx.ReferenceId;
+                        }
+                    }
+                }
+
+                rows.Add(new InventoryMovementReportDto
+                {
+                    Id = tx.Id,
+                    CreatedAt = tx.CreatedAt,
+                    TransactionType = tx.TransactionType,
+                    Direction = isInbound ? "IN" : "OUT",
+                    Quantity = tx.Quantity,
+                    BalanceBefore = balanceBefore,
+                    BalanceAfter = tx.BalanceAfter,
+
+                    CenterInventoryId = tx.CenterInventoryId,
+                    CenterId = inventory?.CenterId ?? string.Empty,
+                    CenterName = centerName,
+
+                    ReliefItemId = inventory?.ReliefItemId ?? string.Empty,
+                    ReliefItemName = itemName,
+                    Unit = unit,
+
+                    ReferenceType = tx.ReferenceType,
+                    ReferenceId = tx.ReferenceId,
+
+                    SourceType = sourceType,
+                    SourceName = sourceName,
+                    SourceReference = sourceReference,
+
+                    DestinationType = destinationType,
+                    DestinationName = destinationName,
+                    DestinationReference = destinationReference,
+                    DestinationAddress = destinationAddress,
+
+                    StaffName = tx.Staff?.FullName,
+                    Note = tx.Note
+                });
+            }
+
+            return Ok(rows);
+        }
+
+        private static bool IsInboundTransaction(string? transactionType)
+        {
+            var type = (transactionType ?? string.Empty).Trim().ToLowerInvariant();
+
+            return type is "donationin" or "manualin" or "stockin" or "receive" or "received" or "inbound";
+        }
+
         public async Task<IActionResult> UpdateThresholds(
             string id,
             UpdateInventoryThresholdsDto dto

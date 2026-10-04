@@ -97,6 +97,9 @@ namespace FloodRelief.Models
         public ICollection<SosRequestItem> Items { get; set; }
             = new List<SosRequestItem>();
 
+        public ICollection<SosVictimSeverityCount> VictimSeverityCounts { get; set; }
+            = new List<SosVictimSeverityCount>();
+
         public ICollection<DonationAllocation> DonationAllocations { get; set; }
             = new List<DonationAllocation>();
     }

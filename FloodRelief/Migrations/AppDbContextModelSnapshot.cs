@@ -649,6 +649,51 @@ namespace FloodRelief.Migrations
                     b.ToTable("sos_requests");
                 });
 
+
+            modelBuilder.Entity("FloodRelief.Models.SosVictimSeverityCount", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AdultCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ChildCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DeathCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DisabledCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ElderlyCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PatientCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<string>("SosRequestId")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SosRequestId", "Severity")
+                        .IsUnique();
+
+                    b.ToTable("sos_victim_severity_counts");
+                });
+
             modelBuilder.Entity("FloodRelief.Models.SosRequestItem", b =>
                 {
                     b.Property<string>("Id")
@@ -1161,6 +1206,18 @@ namespace FloodRelief.Migrations
                     b.Navigation("User");
                 });
 
+
+            modelBuilder.Entity("FloodRelief.Models.SosVictimSeverityCount", b =>
+                {
+                    b.HasOne("FloodRelief.Models.SosRequest", "SosRequest")
+                        .WithMany("VictimSeverityCounts")
+                        .HasForeignKey("SosRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SosRequest");
+                });
+
             modelBuilder.Entity("FloodRelief.Models.SosRequestItem", b =>
                 {
                     b.HasOne("FloodRelief.Models.ReliefItem", "ReliefItem")
@@ -1270,6 +1327,8 @@ namespace FloodRelief.Migrations
                     b.Navigation("DonationAllocations");
 
                     b.Navigation("Items");
+
+                    b.Navigation("VictimSeverityCounts");
                 });
 
             modelBuilder.Entity("FloodRelief.Models.Staff", b =>

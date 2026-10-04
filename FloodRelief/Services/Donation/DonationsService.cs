@@ -337,8 +337,12 @@ namespace FloodRelief.Services.Donations
 
         public async Task<IActionResult> GetAllDonations()
         {
+            // NOTE:
+            // Donations are now itemized in donation_items. The legacy columns
+            // donations.Quantity / DonationType / Description may legitimately be 0/blank.
+            // Return the real item rows and center so admin reports do not show 0 / "-".
             var donations = await _context.Donations
-                .Include(x => x.User)
+                .AsNoTracking()
                 .OrderByDescending(x => x.CreatedAt)
                 .Select(x => new
                 {
@@ -346,24 +350,47 @@ namespace FloodRelief.Services.Donations
 
                     UserId = x.UserId,
 
-                    DonorName = x.User!.FullName,
+                    DonorName = x.User != null
+                        ? x.User.FullName
+                        : "-",
 
-                    PhoneNumber = x.User.PhoneNumber,
+                    PhoneNumber = x.User != null
+                        ? x.User.PhoneNumber
+                        : "",
+
+                    x.CenterId,
+
+                    CenterName = x.Center != null
+                        ? x.Center.CenterName
+                        : "-",
 
                     x.DonationType,
-
                     x.Description,
 
+                    // Keep legacy fields for backward compatibility.
                     x.Quantity,
-
                     x.Unit,
 
+                    Items = x.Items
+                        .OrderBy(item => item.Id)
+                        .Select(item => new
+                        {
+                            item.Id,
+                            item.ReliefItemId,
+                            ReliefItemName = item.ReliefItem != null
+                                ? item.ReliefItem.Name
+                                : "-",
+                            item.Quantity,
+                            item.Unit
+                        })
+                        .ToList(),
+
+                    TotalQuantity = x.Items
+                        .Sum(item => (int?)item.Quantity) ?? 0,
+
                     x.ImageUrl,
-
                     x.Status,
-
                     x.CreatedAt,
-
                     x.UpdatedAt
                 })
                 .ToListAsync();
@@ -1151,6 +1178,116 @@ namespace FloodRelief.Services.Donations
         }
 
 
+
+        // รายงานเส้นทางของบริจาค: ของจากผู้บริจาคไปไหนบ้าง
+        // GET /api/donations/report/traceability
+        public async Task<IActionResult> GetTraceabilityReport()
+        {
+            var batches = await _context.DonationBatches
+                .AsNoTracking()
+                .Include(x => x.Donation)
+                    .ThenInclude(x => x.User)
+                .Include(x => x.Center)
+                .Include(x => x.ReliefItem)
+                .Include(x => x.Allocations)
+                    .ThenInclude(x => x.SosRequest)
+                        .ThenInclude(x => x.User)
+                .Include(x => x.Allocations)
+                    .ThenInclude(x => x.SosRequest)
+                        .ThenInclude(x => x.AssignedStaff)
+                .OrderByDescending(x => x.ReceivedAt)
+                .ThenByDescending(x => x.Id)
+                .ToListAsync();
+
+            var rows = new List<DonationTraceReportDto>();
+
+            foreach (var batch in batches)
+            {
+                var donation = batch.Donation;
+                var donorName = donation?.User?.FullName ?? "ผู้บริจาค";
+                var centerName = batch.Center?.CenterName ?? "-";
+                var itemName = batch.ReliefItem?.Name ?? "-";
+                var unit = batch.ReliefItem?.Unit ?? "หน่วย";
+
+                foreach (var allocation in batch.Allocations
+                    .OrderByDescending(x => x.AllocatedAt))
+                {
+                    var request = allocation.SosRequest;
+                    var destinationType = string.Equals(
+                        request?.RequestType,
+                        "Emergency",
+                        StringComparison.OrdinalIgnoreCase)
+                            ? "EmergencySOS"
+                            : "ReliefRequest";
+
+                    rows.Add(new DonationTraceReportDto
+                    {
+                        Id = allocation.Id,
+                        ActivityAt = allocation.AllocatedAt,
+                        ReceivedAt = batch.ReceivedAt,
+
+                        DonationId = batch.DonationId,
+                        DonationBatchId = batch.Id,
+                        DonorName = donorName,
+
+                        ReliefItemId = batch.ReliefItemId,
+                        ReliefItemName = itemName,
+                        Unit = unit,
+                        Quantity = allocation.Quantity,
+
+                        CenterId = batch.CenterId,
+                        CenterName = centerName,
+
+                        FlowStatus = "Allocated",
+                        DestinationType = destinationType,
+                        DestinationName = request?.User?.FullName ?? "ผู้ขอรับความช่วยเหลือ",
+                        DestinationReference = request == null
+                            ? null
+                            : $"SOS #{request.Id}",
+                        DestinationAddress = request?.AddressDetail,
+                        ReceiveMethod = request?.ReceiveMethod,
+                        RequestStatus = request?.Status,
+                        StaffName = request?.AssignedStaff?.FullName
+                    });
+                }
+
+                if (batch.RemainingQuantity > 0)
+                {
+                    rows.Add(new DonationTraceReportDto
+                    {
+                        Id = $"{batch.Id}-stock",
+                        ActivityAt = batch.ReceivedAt,
+                        ReceivedAt = batch.ReceivedAt,
+
+                        DonationId = batch.DonationId,
+                        DonationBatchId = batch.Id,
+                        DonorName = donorName,
+
+                        ReliefItemId = batch.ReliefItemId,
+                        ReliefItemName = itemName,
+                        Unit = unit,
+                        Quantity = batch.RemainingQuantity,
+
+                        CenterId = batch.CenterId,
+                        CenterName = centerName,
+
+                        FlowStatus = "InStock",
+                        DestinationType = "Inventory",
+                        DestinationName = centerName,
+                        DestinationReference = batch.CenterId,
+                        DestinationAddress = null,
+                        ReceiveMethod = null,
+                        RequestStatus = null,
+                        StaffName = null
+                    });
+                }
+            }
+
+            return Ok(rows
+                .OrderByDescending(x => x.ActivityAt)
+                .ThenByDescending(x => x.Id)
+                .ToList());
+        }
 
         private static string BuildDonationItemSummary(
             IEnumerable<DonationItem> items)

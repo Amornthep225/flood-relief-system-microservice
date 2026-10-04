@@ -19,7 +19,7 @@ namespace FloodRelief.DTOs.Sos
         [StringLength(50)]
         public string EmergencyType { get; set; } = string.Empty;
 
-        [Range(1, 1000, ErrorMessage = "จำนวนผู้ประสบภัยต้องอย่างน้อย 1 คน")]
+        [Range(0, 1000, ErrorMessage = "จำนวนผู้ประสบภัยต้องเป็น 0-1,000 คน")]
         public int VictimCount { get; set; } = 1;
 
         [Range(0, 1000)]
@@ -36,6 +36,10 @@ namespace FloodRelief.DTOs.Sos
 
         [Range(0, 1000, ErrorMessage = "จำนวนผู้เสียชีวิตต้องเป็น 0 ขึ้นไป")]
         public int DeathCount { get; set; }
+
+        // รูปแบบใหม่: แยกจำนวนผู้ประสบภัยตามระดับความรุนแรง
+        // หากไม่ส่งค่าเข้ามา Backend ยังรองรับฟิลด์แบบเดิมเพื่อไม่ให้ Client เก่าพัง
+        public List<CreateSosVictimSeverityCountDto> VictimSeverityCounts { get; set; } = new();
 
         [Required(ErrorMessage = "กรุณาระบุระดับความรุนแรงของผู้ประสบภัย")]
         [StringLength(20)]

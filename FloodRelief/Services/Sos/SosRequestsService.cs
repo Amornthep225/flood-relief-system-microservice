@@ -414,26 +414,155 @@ namespace FloodRelief.Services
                 });
             }
 
+            var hasSeverityBreakdown =
+                dto.VictimSeverityCounts != null &&
+                dto.VictimSeverityCounts.Count > 0;
+
+            var normalizedSeverityCounts =
+                new List<CreateSosVictimSeverityCountDto>();
+
+            int childCount;
+            int adultCount;
+            int elderlyCount;
+            int disabledCount;
+            int patientCount;
+            int deathCount;
+            int victimCount;
+            string overallSeverity;
+
+            if (hasSeverityBreakdown)
+            {
+                var invalidSeverity = dto.VictimSeverityCounts
+                    .FirstOrDefault(x => !SosSeverities.All.Contains(x.Severity));
+
+                if (invalidSeverity != null)
+                {
+                    return BadRequest(new
+                    {
+                        message = "พบระดับความรุนแรงของผู้ประสบภัยที่ไม่ถูกต้อง"
+                    });
+                }
+
+                var duplicatedSeverity = dto.VictimSeverityCounts
+                    .GroupBy(x => x.Severity)
+                    .FirstOrDefault(x => x.Count() > 1);
+
+                if (duplicatedSeverity != null)
+                {
+                    return BadRequest(new
+                    {
+                        message = $"ระดับความรุนแรง {duplicatedSeverity.Key} ถูกส่งมาซ้ำ"
+                    });
+                }
+
+                normalizedSeverityCounts = SosSeverities.All
+                    .Select(severity =>
+                    {
+                        var row = dto.VictimSeverityCounts
+                            .FirstOrDefault(x => x.Severity == severity);
+
+                        return row ?? new CreateSosVictimSeverityCountDto
+                        {
+                            Severity = severity
+                        };
+                    })
+                    .ToList();
+
+                childCount = normalizedSeverityCounts.Sum(x => x.ChildCount);
+                adultCount = normalizedSeverityCounts.Sum(x => x.AdultCount);
+                elderlyCount = normalizedSeverityCounts.Sum(x => x.ElderlyCount);
+                disabledCount = normalizedSeverityCounts.Sum(x => x.DisabledCount);
+                patientCount = normalizedSeverityCounts.Sum(x => x.PatientCount);
+
+                // ผู้เสียชีวิตเป็นยอดรวมแยกจากระดับความรุนแรง
+                // รองรับ client เก่าที่อาจยังส่ง deathCount อยู่ใน breakdown
+                var legacySeverityDeathCount =
+                    normalizedSeverityCounts.Sum(x => x.DeathCount);
+
+                deathCount = dto.DeathCount > 0
+                    ? dto.DeathCount
+                    : legacySeverityDeathCount;
+
+                // ตั้งแต่ requirement ใหม่ deathCount ไม่ผูกกับระดับความรุนแรง
+                foreach (var row in normalizedSeverityCounts)
+                {
+                    row.DeathCount = 0;
+                }
+
+                // VictimCount = ผู้ประสบภัยที่ยังมีชีวิตเท่านั้น
+                victimCount =
+                    childCount +
+                    adultCount +
+                    elderlyCount +
+                    disabledCount +
+                    patientCount;
+
+                if (victimCount < 1 && deathCount < 1)
+                {
+                    return BadRequest(new
+                    {
+                        message = "กรุณาระบุผู้ประสบภัยหรือผู้เสียชีวิตอย่างน้อย 1 คน"
+                    });
+                }
+
+                if (victimCount > 1000 || deathCount > 1000)
+                {
+                    return BadRequest(new
+                    {
+                        message = "จำนวนผู้ประสบภัยและผู้เสียชีวิตต้องไม่เกิน 1,000 คน"
+                    });
+                }
+
+                overallSeverity = victimCount > 0
+                    ? GetHighestSeverity(normalizedSeverityCounts)
+                    : SosSeverities.Critical;
+            }
+            else
+            {
+                var accountedLivingVictimTotal =
+                    dto.ChildCount +
+                    dto.ElderlyCount +
+                    dto.DisabledCount +
+                    dto.PatientCount;
+
+                if (accountedLivingVictimTotal > dto.VictimCount)
+                {
+                    return BadRequest(new
+                    {
+                        message = "จำนวนเด็ก ผู้สูงอายุ ผู้พิการ และผู้ป่วยรวมกันต้องไม่เกินจำนวนผู้ประสบภัยทั้งหมด"
+                    });
+                }
+
+                childCount = dto.ChildCount;
+                adultCount = Math.Max(dto.VictimCount - accountedLivingVictimTotal, 0);
+                elderlyCount = dto.ElderlyCount;
+                disabledCount = dto.DisabledCount;
+                patientCount = dto.PatientCount;
+                deathCount = dto.DeathCount;
+                victimCount = dto.VictimCount;
+                overallSeverity = victimCount > 0
+                    ? dto.Severity
+                    : SosSeverities.Critical;
+
+                normalizedSeverityCounts.Add(
+                    new CreateSosVictimSeverityCountDto
+                    {
+                        Severity = overallSeverity,
+                        ChildCount = childCount,
+                        AdultCount = adultCount,
+                        ElderlyCount = elderlyCount,
+                        DisabledCount = disabledCount,
+                        PatientCount = patientCount,
+                        DeathCount = 0
+                    }
+                );
+            }
+
             if (dto.Latitude == 0 && dto.Longitude == 0)
             {
                 return BadRequest(new
                 {
                     message = "กรุณาปักหมุดตำแหน่งเหตุฉุกเฉิน"
-                });
-            }
-
-            var accountedVictimTotal =
-                dto.ChildCount +
-                dto.ElderlyCount +
-                dto.DisabledCount +
-                dto.PatientCount +
-                dto.DeathCount;
-
-            if (accountedVictimTotal > dto.VictimCount)
-            {
-                return BadRequest(new
-                {
-                    message = "จำนวนเด็ก ผู้สูงอายุ ผู้พิการ ผู้ป่วย และผู้เสียชีวิตรวมกันต้องไม่เกินจำนวนผู้ประสบภัยทั้งหมด"
                 });
             }
 
@@ -461,13 +590,13 @@ namespace FloodRelief.Services
                     Longitude = dto.Longitude,
                     AddressDetail = dto.AddressDetail.Trim(),
                     EmergencyType = dto.EmergencyType,
-                    VictimCount = dto.VictimCount,
-                    ChildCount = dto.ChildCount,
-                    ElderlyCount = dto.ElderlyCount,
-                    DisabledCount = dto.DisabledCount,
-                    PatientCount = dto.PatientCount,
-                    DeathCount = dto.DeathCount,
-                    Severity = dto.Severity,
+                    VictimCount = victimCount,
+                    ChildCount = childCount,
+                    ElderlyCount = elderlyCount,
+                    DisabledCount = disabledCount,
+                    PatientCount = patientCount,
+                    DeathCount = deathCount,
+                    Severity = overallSeverity,
                     WaterLevel = dto.WaterLevel,
                     EmergencyDetail = dto.EmergencyDetail.Trim(),
                     UserRemark = dto.EmergencyDetail.Trim(),
@@ -475,6 +604,29 @@ namespace FloodRelief.Services
                     Status = SosRequestStatuses.Pending,
                     CreatedAt = DateTime.Now
                 };
+
+                foreach (var row in normalizedSeverityCounts.Where(x =>
+                    x.ChildCount > 0 ||
+                    x.AdultCount > 0 ||
+                    x.ElderlyCount > 0 ||
+                    x.DisabledCount > 0 ||
+                    x.PatientCount > 0 ||
+                    x.DeathCount > 0))
+                {
+                    request.VictimSeverityCounts.Add(
+                        new SosVictimSeverityCount
+                        {
+                            SosRequestId = request.Id,
+                            Severity = row.Severity,
+                            ChildCount = row.ChildCount,
+                            AdultCount = row.AdultCount,
+                            ElderlyCount = row.ElderlyCount,
+                            DisabledCount = row.DisabledCount,
+                            PatientCount = row.PatientCount,
+                            DeathCount = row.DeathCount
+                        }
+                    );
+                }
 
                 _context.SosRequests.Add(request);
 
@@ -524,6 +676,17 @@ namespace FloodRelief.Services
                         emergencyType = request.EmergencyType,
                         deathCount = request.DeathCount,
                         severity = request.Severity,
+                        victimSeverityCounts = request.VictimSeverityCounts
+                            .Select(x => new
+                            {
+                                x.Severity,
+                                x.ChildCount,
+                                x.AdultCount,
+                                x.ElderlyCount,
+                                x.DisabledCount,
+                                x.PatientCount,
+                                x.DeathCount
+                            }),
                         priority = request.Priority,
                         status = request.Status,
                         createdAt = request.CreatedAt
@@ -536,6 +699,32 @@ namespace FloodRelief.Services
                 _notificationRealtime.DiscardPending();
                 throw;
             }
+        }
+
+        private static string GetHighestSeverity(
+            IEnumerable<CreateSosVictimSeverityCountDto> rows)
+        {
+            static int Rank(string severity) => severity switch
+            {
+                SosSeverities.Critical => 4,
+                SosSeverities.Severe => 3,
+                SosSeverities.Moderate => 2,
+                SosSeverities.Mild => 1,
+                _ => 0
+            };
+
+            return rows
+                .Where(x =>
+                    x.ChildCount +
+                    x.AdultCount +
+                    x.ElderlyCount +
+                    x.DisabledCount +
+                    x.PatientCount +
+                    x.DeathCount > 0)
+                .OrderByDescending(x => Rank(x.Severity))
+                .Select(x => x.Severity)
+                .FirstOrDefault()
+                ?? SosSeverities.Mild;
         }
 
         private static string DetermineEmergencyPriority(
@@ -646,11 +835,24 @@ namespace FloodRelief.Services
                     EmergencyType = x.EmergencyType,
                     VictimCount = x.VictimCount,
                     ChildCount = x.ChildCount,
+                    AdultCount = x.VictimSeverityCounts.Sum(v => v.AdultCount),
                     ElderlyCount = x.ElderlyCount,
                     DisabledCount = x.DisabledCount,
                     PatientCount = x.PatientCount,
                     DeathCount = x.DeathCount,
                     Severity = x.Severity,
+                    VictimSeverityCounts = x.VictimSeverityCounts
+                        .OrderBy(v => v.Id)
+                        .Select(v => new SosVictimSeverityCountDto
+                        {
+                            Severity = v.Severity,
+                            ChildCount = v.ChildCount,
+                            AdultCount = v.AdultCount,
+                            ElderlyCount = v.ElderlyCount,
+                            DisabledCount = v.DisabledCount,
+                            PatientCount = v.PatientCount,
+                            DeathCount = v.DeathCount
+                        }).ToList(),
                     WaterLevel = x.WaterLevel,
                     EmergencyDetail = x.EmergencyDetail,
                     Items = x.Items.Select(i => new SosRequestItemDto
@@ -729,11 +931,24 @@ namespace FloodRelief.Services
         x.EmergencyType,
         x.VictimCount,
         x.ChildCount,
+        AdultCount = x.VictimSeverityCounts.Sum(v => v.AdultCount),
         x.ElderlyCount,
         x.DisabledCount,
         x.PatientCount,
         x.DeathCount,
         x.Severity,
+        VictimSeverityCounts = x.VictimSeverityCounts
+            .OrderBy(v => v.Id)
+            .Select(v => new
+            {
+                v.Severity,
+                v.ChildCount,
+                v.AdultCount,
+                v.ElderlyCount,
+                v.DisabledCount,
+                v.PatientCount,
+                v.DeathCount
+            }).ToList(),
         x.WaterLevel,
         x.EmergencyDetail,
         x.Priority,
@@ -863,11 +1078,24 @@ namespace FloodRelief.Services
                     EmergencyType = x.EmergencyType,
                     VictimCount = x.VictimCount,
                     ChildCount = x.ChildCount,
+                    AdultCount = x.VictimSeverityCounts.Sum(v => v.AdultCount),
                     ElderlyCount = x.ElderlyCount,
                     DisabledCount = x.DisabledCount,
                     PatientCount = x.PatientCount,
                     DeathCount = x.DeathCount,
                     Severity = x.Severity,
+                    VictimSeverityCounts = x.VictimSeverityCounts
+                        .OrderBy(v => v.Id)
+                        .Select(v => new SosVictimSeverityCountDto
+                        {
+                            Severity = v.Severity,
+                            ChildCount = v.ChildCount,
+                            AdultCount = v.AdultCount,
+                            ElderlyCount = v.ElderlyCount,
+                            DisabledCount = v.DisabledCount,
+                            PatientCount = v.PatientCount,
+                            DeathCount = v.DeathCount
+                        }).ToList(),
                     WaterLevel = x.WaterLevel,
                     EmergencyDetail = x.EmergencyDetail,
 
@@ -2300,11 +2528,24 @@ namespace FloodRelief.Services
                 EmergencyType = x.EmergencyType,
                 VictimCount = x.VictimCount,
                 ChildCount = x.ChildCount,
+                AdultCount = x.VictimSeverityCounts.Sum(v => v.AdultCount),
                 ElderlyCount = x.ElderlyCount,
                 DisabledCount = x.DisabledCount,
                 PatientCount = x.PatientCount,
                     DeathCount = x.DeathCount,
                 Severity = x.Severity,
+                VictimSeverityCounts = x.VictimSeverityCounts
+                    .OrderBy(v => v.Id)
+                    .Select(v => new SosVictimSeverityCountDto
+                    {
+                        Severity = v.Severity,
+                        ChildCount = v.ChildCount,
+                        AdultCount = v.AdultCount,
+                        ElderlyCount = v.ElderlyCount,
+                        DisabledCount = v.DisabledCount,
+                        PatientCount = v.PatientCount,
+                        DeathCount = v.DeathCount
+                    }).ToList(),
                 WaterLevel = x.WaterLevel,
                 EmergencyDetail = x.EmergencyDetail,
                 Items = x.Items.Select(i => new SosRequestItemDto
@@ -2398,11 +2639,24 @@ namespace FloodRelief.Services
                     EmergencyType = x.EmergencyType,
                     VictimCount = x.VictimCount,
                     ChildCount = x.ChildCount,
+                    AdultCount = x.VictimSeverityCounts.Sum(v => v.AdultCount),
                     ElderlyCount = x.ElderlyCount,
                     DisabledCount = x.DisabledCount,
                     PatientCount = x.PatientCount,
                     DeathCount = x.DeathCount,
                     Severity = x.Severity,
+                    VictimSeverityCounts = x.VictimSeverityCounts
+                        .OrderBy(v => v.Id)
+                        .Select(v => new SosVictimSeverityCountDto
+                        {
+                            Severity = v.Severity,
+                            ChildCount = v.ChildCount,
+                            AdultCount = v.AdultCount,
+                            ElderlyCount = v.ElderlyCount,
+                            DisabledCount = v.DisabledCount,
+                            PatientCount = v.PatientCount,
+                            DeathCount = v.DeathCount
+                        }).ToList(),
                     WaterLevel = x.WaterLevel,
                     EmergencyDetail = x.EmergencyDetail,
                     Items = x.Items.Select(i => new SosRequestItemDto
@@ -2522,11 +2776,24 @@ namespace FloodRelief.Services
                     EmergencyType = x.EmergencyType,
                     VictimCount = x.VictimCount,
                     ChildCount = x.ChildCount,
+                    AdultCount = x.VictimSeverityCounts.Sum(v => v.AdultCount),
                     ElderlyCount = x.ElderlyCount,
                     DisabledCount = x.DisabledCount,
                     PatientCount = x.PatientCount,
                     DeathCount = x.DeathCount,
                     Severity = x.Severity,
+                    VictimSeverityCounts = x.VictimSeverityCounts
+                        .OrderBy(v => v.Id)
+                        .Select(v => new SosVictimSeverityCountDto
+                        {
+                            Severity = v.Severity,
+                            ChildCount = v.ChildCount,
+                            AdultCount = v.AdultCount,
+                            ElderlyCount = v.ElderlyCount,
+                            DisabledCount = v.DisabledCount,
+                            PatientCount = v.PatientCount,
+                            DeathCount = v.DeathCount
+                        }).ToList(),
                     WaterLevel = x.WaterLevel,
                     EmergencyDetail = x.EmergencyDetail,
                     Items = x.Items.Select(i => new SosRequestItemDto

@@ -41,6 +41,15 @@ namespace FloodRelief.Controllers.Donations
         {
             return await _service.GetAllDonations();
         }
+        // รายงานเส้นทางของบริจาค: ของจากผู้บริจาคไปไหนบ้าง
+        // GET /api/donations/report/traceability
+        [HttpGet("report/traceability")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetTraceabilityReport()
+        {
+            return await _service.GetTraceabilityReport();
+        }
+
         [HttpGet("{id}")]
         //[Authorize]
         [Authorize(Roles = "User,Staff,Admin")]

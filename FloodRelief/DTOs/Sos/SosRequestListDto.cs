@@ -33,6 +33,8 @@ namespace FloodRelief.DTOs.Sos
 
         public int ChildCount { get; set; }
 
+        public int AdultCount { get; set; }
+
         public int ElderlyCount { get; set; }
 
         public int DisabledCount { get; set; }
@@ -42,6 +44,8 @@ namespace FloodRelief.DTOs.Sos
         public int DeathCount { get; set; }
 
         public string? Severity { get; set; }
+
+        public List<SosVictimSeverityCountDto> VictimSeverityCounts { get; set; } = new();
 
         public decimal? WaterLevel { get; set; }
 

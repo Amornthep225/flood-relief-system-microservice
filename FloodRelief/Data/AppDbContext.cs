@@ -21,6 +21,7 @@ namespace FloodRelief.Data
 
         public DbSet<SosRequest> SosRequests { get; set; } = null!;
         public DbSet<SosRequestItem> SosRequestItems { get; set; } = null!;
+        public DbSet<SosVictimSeverityCount> SosVictimSeverityCounts { get; set; } = null!;
 
         public DbSet<Donation> Donations { get; set; } = null!;
         public DbSet<DonationItem> DonationItems { get; set; } = null!;
@@ -80,6 +81,16 @@ namespace FloodRelief.Data
                 .WithMany(x => x.SosRequestItems)
                 .HasForeignKey(x => x.ReliefItemId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SosVictimSeverityCount>()
+                .HasIndex(x => new { x.SosRequestId, x.Severity })
+                .IsUnique();
+
+            modelBuilder.Entity<SosVictimSeverityCount>()
+                .HasOne(x => x.SosRequest)
+                .WithMany(x => x.VictimSeverityCounts)
+                .HasForeignKey(x => x.SosRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
 
         private static void ConfigureDonations(

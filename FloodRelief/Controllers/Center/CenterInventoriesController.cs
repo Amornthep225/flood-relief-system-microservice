@@ -56,6 +56,15 @@ namespace FloodRelief.Controllers.Center
         {
             return await _service.StockOut(dto);
         }
+        // รายงานการเคลื่อนไหวคลัง พร้อมที่มาและปลายทาง
+        // GET /api/CenterInventories/report/movements
+        [HttpGet("report/movements")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetMovementReport()
+        {
+            return await _service.GetMovementReport();
+        }
+
         // แก้ไขจำนวนขั้นต่ำ
         // PUT /api/inventories/0000000001/minimum
         [HttpPut("{id}/minimum")]
