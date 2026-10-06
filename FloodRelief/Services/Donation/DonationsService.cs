@@ -55,23 +55,43 @@ namespace FloodRelief.Services.Donations
             }
 
             // =====================================================
-            // ระบบใช้ศูนย์เดียว
-            // หา Center ที่เปิดใช้งานโดยอัตโนมัติ
+            // ถ้าหน้าของขาดแคลนส่ง CenterId มา ให้บริจาคเข้าศูนย์นั้นโดยตรง
+            // ถ้าไม่ส่งมา คงพฤติกรรมเดิมโดยเลือกศูนย์ Active แรกอัตโนมัติ
             // =====================================================
-            var centerId =
-                await _context.Centers
+            string? centerId;
+
+            if (!string.IsNullOrWhiteSpace(dto.CenterId))
+            {
+                centerId = await _context.Centers
+                    .AsNoTracking()
+                    .Where(x => x.Id == dto.CenterId && x.IsActive)
+                    .Select(x => x.Id)
+                    .FirstOrDefaultAsync();
+
+                if (string.IsNullOrWhiteSpace(centerId))
+                {
+                    return BadRequest(new
+                    {
+                        message = "ไม่พบศูนย์ช่วยเหลือที่เลือก หรือศูนย์ไม่ได้เปิดใช้งาน"
+                    });
+                }
+            }
+            else
+            {
+                centerId = await _context.Centers
                     .AsNoTracking()
                     .Where(x => x.IsActive)
                     .OrderBy(x => x.Id)
                     .Select(x => x.Id)
                     .FirstOrDefaultAsync();
 
-            if (string.IsNullOrWhiteSpace(centerId))
-            {
-                return BadRequest(new
+                if (string.IsNullOrWhiteSpace(centerId))
                 {
-                    message = "ไม่พบศูนย์ช่วยเหลือที่เปิดใช้งาน"
-                });
+                    return BadRequest(new
+                    {
+                        message = "ไม่พบศูนย์ช่วยเหลือที่เปิดใช้งาน"
+                    });
+                }
             }
 
             // =====================================================
@@ -311,8 +331,18 @@ namespace FloodRelief.Services.Donations
         {
             var userId = _currentUser.UserId;
 
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return Unauthorized(new
+                {
+                    message = "ไม่พบข้อมูลผู้ใช้งาน"
+                });
+            }
 
+            // Donation รุ่นปัจจุบันเก็บรายการจริงไว้ใน donation_items
+            // จึงต้องส่ง Items กลับไปให้หน้าประวัติใช้แสดงและรวมจำนวน
             var donations = await _context.Donations
+                .AsNoTracking()
                 .Where(x => x.UserId == userId)
                 .OrderByDescending(x => x.CreatedAt)
                 .Select(x => new
@@ -320,15 +350,34 @@ namespace FloodRelief.Services.Donations
                     x.Id,
                     x.DonationType,
                     x.Description,
+
+                    // คง legacy fields ไว้เพื่อไม่กระทบหน้าที่อาจใช้งานอยู่
                     x.Quantity,
                     x.Unit,
+
+                    Items = x.Items
+                        .OrderBy(item => item.Id)
+                        .Select(item => new
+                        {
+                            item.Id,
+                            item.ReliefItemId,
+                            ReliefItemName = item.ReliefItem != null
+                                ? item.ReliefItem.Name
+                                : "-",
+                            item.Quantity,
+                            item.Unit
+                        })
+                        .ToList(),
+
+                    TotalQuantity = x.Items
+                        .Sum(item => (int?)item.Quantity) ?? 0,
+
                     x.ImageUrl,
                     x.Status,
                     x.CreatedAt,
                     x.UpdatedAt
                 })
                 .ToListAsync();
-
 
             return Ok(donations);
         }

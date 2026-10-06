@@ -569,7 +569,7 @@ namespace FloodRelief.Services.Center
             var inventories =
                 await _context.CenterInventories
                     .Where(x =>
-                        x.Quantity <=
+                        x.Quantity <
                         x.MinimumQuantity
                     )
                     .OrderBy(x =>

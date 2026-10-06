@@ -47,5 +47,7 @@ namespace FloodRelief.DTOs.Sos
         public string ReliefItemName { get; set; } = string.Empty;
         public string Unit { get; set; } = string.Empty;
         public int RequestedQuantity { get; set; }
+        public string RequesterName { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
     }
 }

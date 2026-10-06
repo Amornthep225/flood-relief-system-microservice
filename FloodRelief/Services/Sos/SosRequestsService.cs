@@ -2971,7 +2971,40 @@ namespace FloodRelief.Services
 
 
             // ==========================================
-            // 7. Response
+            // 7. ดึงคำขอ Pending ของผู้ใช้อื่นที่ขอสิ่งของชนิดเดียวกัน
+            // เพื่อให้ Staff/Admin เห็นภาพรวมก่อนกระจายของในคลัง
+            // ==========================================
+
+            var pendingRequests = await _context.SosRequestItems
+                .AsNoTracking()
+                .Where(x =>
+                    x.SosRequestId != sosRequest.Id &&
+                    reliefItemIds.Contains(x.ReliefItemId) &&
+                    x.SosRequest != null &&
+                    x.SosRequest.Status == SosRequestStatuses.Pending &&
+                    x.SosRequest.RequestType == "Relief")
+                .OrderBy(x => x.SosRequest!.CreatedAt)
+                .Select(x => new SosPendingRequestDto
+                {
+                    SosRequestId = x.SosRequestId,
+                    ReliefItemId = x.ReliefItemId,
+                    ReliefItemName = x.ReliefItem != null ? x.ReliefItem.Name : "ไม่ระบุ",
+                    Unit = x.Unit ?? "",
+                    RequestedQuantity = x.Quantity,
+                    RequesterName = x.SosRequest!.User != null ? x.SosRequest.User.FullName : "ผู้ใช้งาน",
+                    CreatedAt = x.SosRequest.CreatedAt
+                })
+                .ToListAsync();
+
+            foreach (var item in items)
+            {
+                item.PendingRequests = pendingRequests
+                    .Where(x => x.ReliefItemId == item.ReliefItemId)
+                    .ToList();
+            }
+
+            // ==========================================
+            // 8. Response
             // ==========================================
 
             var response = new SosStockCheckResponseDto
@@ -2984,7 +3017,8 @@ namespace FloodRelief.Services
                     items.Count > 0 &&
                     items.All(x => x.IsEnough),
 
-                Items = items
+                Items = items,
+                PendingRequests = pendingRequests
             };
 
 
